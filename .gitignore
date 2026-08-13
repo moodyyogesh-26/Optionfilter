@@ -1,0 +1,38 @@
+# Python & Environments
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+.env
+
+# Dynamic Data Files & Caches
+data/*.csv
+data/ltp_cache.json
+data/token.json
+data/meta.json
+data/weekly_high_cache.json
+*.csv
+*.gz
+*.zip
+
+# Keep essential data files
+!data/blacklist.json
+!data/.gitkeep
+
+# Streamlit Secrets (Sensitive API Keys)
+.streamlit/secrets.toml
+!.streamlit/secrets.toml.example
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# System files
+.DS_Store
+Thumbs.db
