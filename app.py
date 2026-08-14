@@ -615,12 +615,12 @@ if logo_base64:
     <div style="display: flex; align-items: center; gap: 16px; margin-top: 0.5rem; margin-bottom: 1.2rem; flex-wrap: wrap;">
         <img src="data:image/png;base64,{logo_base64}" style="height: 52px; max-height: 52px; width: auto; object-fit: contain; vertical-align: middle; flex-shrink: 0;" />
         <h1 style="margin: 0; padding: 0; color: #1e3a8a; font-size: 1.9rem; font-weight: 700; line-height: 1.3; display: inline-block;">
-            JSTT Weekly High Scanner
+            JSTT High Scanner
         </h1>
     </div>
     """, unsafe_allow_html=True)
 else:
-    st.title("JSTT Weekly High Scanner")
+    st.title("JSTT High Scanner")
 
 # Secret Handling (Client View Mode)
 is_client_view = "UPSTOX_ACCESS_TOKEN" in st.secrets
