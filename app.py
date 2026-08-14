@@ -22,7 +22,7 @@ def get_ist_now():
 
 # Set page configuration
 st.set_page_config(
-    page_title="JSTT Weekly High Scanner",
+    page_title="JSTT Trigger Scanner",
     page_icon="📈",
     layout="wide"
 )
@@ -527,7 +527,7 @@ def display_option_chain(df, access_token):
     df['change_val'] = df.apply(calculate_numeric_change, axis=1)
     df['change %'] = df['change_val']
 
-    trigger_col_name = 'Weekly High'
+    trigger_col_name = 'JSTT Trigger'
     df = df.rename(columns={'Trigger': trigger_col_name})
 
     # Filter Controls
