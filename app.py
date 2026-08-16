@@ -22,7 +22,7 @@ def get_ist_now():
 
 # Set page configuration
 st.set_page_config(
-    page_title="JSTT Option Scanner",
+    page_title="JSTT Trigger Scanner",
     page_icon="📈",
     layout="wide"
 )
@@ -69,10 +69,10 @@ if not os.path.exists(DATA_DIR):
 TOKEN_FILE = os.path.join(DATA_DIR, 'token.json')
 META_FILE = os.path.join(DATA_DIR, 'meta.json')
 LTP_CACHE_FILE = os.path.join(DATA_DIR, 'ltp_cache.json')
-JSTT_Trigger_CACHE_FILE = os.path.join(DATA_DIR, 'JSTT_Trigger_cache.json')
+WEEKLY_HIGH_CACHE_FILE = os.path.join(DATA_DIR, 'weekly_high_cache.json')
 
 FILES = {
-    'JSTT_Trigger': os.path.join(DATA_DIR, 'JSTT_Trigger.csv'),
+    'Weekly_High': os.path.join(DATA_DIR, 'weekly_high.csv'),
     'Strike_Selection': os.path.join(DATA_DIR, 'strike_selection.csv')
 }
 
@@ -127,10 +127,10 @@ def save_ltp_cache(new_data):
     except:
         pass
 
-def load_JSTT_Trigger_cache():
-    if os.path.exists(JSTT_Trigger_CACHE_FILE):
+def load_weekly_high_cache():
+    if os.path.exists(WEEKLY_HIGH_CACHE_FILE):
         try:
-            with open(JSTT_Trigger_CACHE_FILE, 'r') as f:
+            with open(WEEKLY_HIGH_CACHE_FILE, 'r') as f:
                 data = json.load(f)
                 today_str = get_ist_now().strftime('%Y-%m-%d')
                 if data.get('date') == today_str:
@@ -139,16 +139,16 @@ def load_JSTT_Trigger_cache():
             pass
     return {}
 
-def save_JSTT_Trigger_cache(new_highs):
+def save_weekly_high_cache(new_highs):
     try:
-        cache = load_JSTT_Trigger_cache()
+        cache = load_weekly_high_cache()
         cache.update(new_highs)
         today_str = get_ist_now().strftime('%Y-%m-%d')
         save_data = {
             'date': today_str,
             'highs': cache
         }
-        with open(JSTT_Trigger_CACHE_FILE, 'w') as f:
+        with open(WEEKLY_HIGH_CACHE_FILE, 'w') as f:
             json.dump(save_data, f)
     except:
         pass
@@ -417,10 +417,11 @@ def process_bhavcopy(bhav_file, df_json, target_expiry_index=0, strike_bhav_file
         if result.empty and not atm_rows.empty:
             st.error("Data mismatch: Found options in Bhavcopy but couldn't find them in NSE.json. Please update NSE.json via the sidebar.")
 
+        # --- MODIFICATION START: Included 'FinInstrmNm' here ---
         final_df = result[[
             'TckrSymb', 'XpryDt', 'StrkPric', 'OptnTp', 
             'FuturePrice', 'ClsPric', 'instrument_key',
-            'HghPric', 'LwPric', 'LastPric'
+            'HghPric', 'LwPric', 'LastPric', 'FinInstrmNm'
         ]]
 
         final_df = final_df.rename(columns={
@@ -430,8 +431,10 @@ def process_bhavcopy(bhav_file, df_json, target_expiry_index=0, strike_bhav_file
             'OptnTp': 'OptionType',
             'HghPric': 'HighPrice',
             'LwPric': 'LowPrice',
-            'LastPric': 'LastPrice'
+            'LastPric': 'LastPrice',
+            'FinInstrmNm': 'Scrip'  # Renaming FinInstrmNm to Scrip
         })
+        # --- MODIFICATION END ---
 
         return final_df, target_expiry, available_expiries
 
@@ -477,7 +480,7 @@ def fetch_ltp(instrument_keys, access_token):
 def display_option_chain(df, access_token):
     st.caption(f"Last Updated: {get_ist_now().strftime('%H:%M:%S')} IST")
     if df.empty:
-        st.info("No data to display. Please upload JSTT Trigger Bhavcopy files in the sidebar.")
+        st.info("No data to display. Please upload Weekly High Bhavcopy files in the sidebar.")
         return
 
     if access_token:
@@ -505,12 +508,12 @@ def display_option_chain(df, access_token):
 
     df['ltp'] = df.apply(clean_ltp, axis=1)
 
-    # JSTT Trigger trigger: Priority given to 5-day MAX high calculated from uploaded Bhavcopies
+    # Weekly High trigger: Priority given to 5-day MAX high calculated from uploaded Bhavcopies
     if 'HighPrice' in df.columns and (df['HighPrice'] > 0).any():
         df['Trigger'] = df['HighPrice']
     else:
         df['Trigger'] = 0.0
-        high_cache = load_JSTT_Trigger_cache()
+        high_cache = load_weekly_high_cache()
         if high_cache:
             df['Trigger'] = df['instrument_key'].map(high_cache).fillna(df['Trigger'])
 
@@ -565,7 +568,9 @@ def display_option_chain(df, access_token):
     calls_df = calls_df.sort_values(by='change %', ascending=False)
     puts_df = puts_df.sort_values(by='change %', ascending=False)
 
-    display_cols = ['Symbol', 'StrikePrice', trigger_col_name, 'ltp', 'change %']
+    # --- MODIFICATION START: Included 'Scrip' in display columns ---
+    display_cols = ['Symbol', 'Scrip', 'StrikePrice', trigger_col_name, 'ltp', 'change %']
+    # --- MODIFICATION END ---
     
     def color_change(val):
         if isinstance(val, (int, float)):
@@ -615,12 +620,12 @@ if logo_base64:
     <div style="display: flex; align-items: center; gap: 16px; margin-top: 0.5rem; margin-bottom: 1.2rem; flex-wrap: wrap;">
         <img src="data:image/png;base64,{logo_base64}" style="height: 52px; max-height: 52px; width: auto; object-fit: contain; vertical-align: middle; flex-shrink: 0;" />
         <h1 style="margin: 0; padding: 0; color: #1e3a8a; font-size: 1.9rem; font-weight: 700; line-height: 1.3; display: inline-block;">
-            JSTT Option Scanner
+            JSTT High Scanner
         </h1>
     </div>
     """, unsafe_allow_html=True)
 else:
-    st.title("JSTT Option Scanner")
+    st.title("JSTT High Scanner")
 
 # Secret Handling (Client View Mode)
 is_client_view = "UPSTOX_ACCESS_TOKEN" in st.secrets
@@ -694,20 +699,20 @@ else:
         if 'Strike_Selection' in meta and os.path.exists(FILES['Strike_Selection']):
             st.caption(f"📅 Data Date: {meta['Strike_Selection']}")
 
-        # JSTT Trigger Uploader
-        st.subheader("2. JSTT Trigger Bhavcopy")
-        uploaded_wh = st.file_uploader("Upload JSTT Trigger Bhavcopy (Multiple CSVs or ZIP)", type=['csv', 'zip'], accept_multiple_files=True, key='wh_sel')
+        # Weekly High Uploader
+        st.subheader("2. Weekly High Bhavcopy")
+        uploaded_wh = st.file_uploader("Upload Weekly High Bhavcopy (Multiple CSVs or ZIP)", type=['csv', 'zip'], accept_multiple_files=True, key='wh_sel')
         if uploaded_wh:
             csv_content, csv_name = process_uploaded_files(uploaded_wh)
             if csv_content:
-                with open(FILES['JSTT_Trigger'], 'wb') as f:
+                with open(FILES['Weekly_High'], 'wb') as f:
                     f.write(csv_content)
                 if csv_name:
-                    save_meta('JSTT_Trigger', csv_name)
-                st.success(f"JSTT Trigger file updated from {csv_name}!")
+                    save_meta('Weekly_High', csv_name)
+                st.success(f"Weekly High file updated from {csv_name}!")
 
-        if 'JSTT_Trigger' in meta and os.path.exists(FILES['JSTT_Trigger']):
-            st.caption(f"📅 Data Date: {meta['JSTT_Trigger']}")
+        if 'Weekly_High' in meta and os.path.exists(FILES['Weekly_High']):
+            st.caption(f"📅 Data Date: {meta['Weekly_High']}")
 
         st.markdown("---")
         st.header("Auto Refresh")
@@ -720,16 +725,15 @@ if not nse_json_df.empty:
     run_every = refresh_interval if auto_refresh else None
     strike_file = FILES.get('Strike_Selection') if os.path.exists(FILES.get('Strike_Selection', '')) else None
 
-    if os.path.exists(FILES['JSTT_Trigger']):
+    if os.path.exists(FILES['Weekly_High']):
         @st.fragment(run_every=run_every)
-        def show_JSTT_Trigger():
-            df_wh, target_exp, all_exps = process_bhavcopy(FILES['JSTT_Trigger'], nse_json_df, target_expiry_index=target_expiry_idx, strike_bhav_file=strike_file)
+        def show_weekly_high():
+            df_wh, target_exp, all_exps = process_bhavcopy(FILES['Weekly_High'], nse_json_df, target_expiry_index=target_expiry_idx, strike_bhav_file=strike_file)
             if target_exp:
                 st.info(f"📅 Displaying Expiry: **{target_exp.strftime('%d-%b-%Y')}**")
             display_option_chain(df_wh, access_token)
-        show_JSTT_Trigger()
+        show_weekly_high()
     else:
-        st.warning("JSTT Trigger Bhavcopy file not found. Please upload 'JSTT Trigger Bhavcopy' (CSV/ZIP) in the sidebar.")
+        st.warning("Weekly High Bhavcopy file not found. Please upload 'Weekly High Bhavcopy' (CSV/ZIP) in the sidebar.")
 else:
     st.error("Critical Error: NSE.json could not be loaded.")
-
