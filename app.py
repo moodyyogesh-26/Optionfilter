@@ -580,10 +580,10 @@ def display_option_chain(df, access_token):
     calls_df = calls_df.sort_values(by='change %', ascending=False)
     puts_df = puts_df.sort_values(by='change %', ascending=False)
 
-    display_cols = ['Symbol', 'StrikePrice', trigger_col_name, 'ltp', 'change %', 'Scrip']
+    display_cols = ['Symbol', 'StrikePrice', trigger_col_name, 'LTP', 'Change %', 'Scrip']
     
     # Exclude 'Scrip' from the list of columns visible by default
-    default_visible_cols = ['Symbol', 'StrikePrice', trigger_col_name, 'ltp', 'change %']
+    default_visible_cols = ['Symbol', 'StrikePrice', trigger_col_name, 'LTP', 'Change %']
     
     def color_change(val):
         if isinstance(val, (int, float)):
