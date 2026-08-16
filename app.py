@@ -569,7 +569,7 @@ def display_option_chain(df, access_token):
     puts_df = puts_df.sort_values(by='change %', ascending=False)
 
     # --- MODIFICATION START: Included 'Scrip' in display columns ---
-    display_cols = ['Symbol', 'Scrip', 'StrikePrice', trigger_col_name, 'ltp', 'change %']
+    display_cols = ['Symbol', 'StrikePrice', trigger_col_name, 'ltp', 'change %', 'Scrip']
     # --- MODIFICATION END ---
     
     def color_change(val):
