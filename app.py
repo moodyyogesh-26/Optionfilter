@@ -444,8 +444,8 @@ def process_bhavcopy(bhav_file, df_json, target_expiry_index=0, strike_bhav_file
         # 3. Safely convert StrikePrice to string and remove ".0" at the end if present
         strike_str = final_df['StrikePrice'].astype(str).str.replace(r'\.0$', '', regex=True)
         
-        # 4. Concatenate to form the final Scrip format
-        final_df['Scrip'] = final_df['Symbol'] + formatted_date + opt_type + strike_str
+        # 4. Concatenate to form the final Scrip format with a comma at the end
+        final_df['Scrip'] = final_df['Symbol'] + formatted_date + opt_type + strike_str + ","
         # --- MODIFICATION END ---
 
         return final_df, target_expiry, available_expiries
