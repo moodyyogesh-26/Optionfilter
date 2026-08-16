@@ -417,11 +417,12 @@ def process_bhavcopy(bhav_file, df_json, target_expiry_index=0, strike_bhav_file
         if result.empty and not atm_rows.empty:
             st.error("Data mismatch: Found options in Bhavcopy but couldn't find them in NSE.json. Please update NSE.json via the sidebar.")
 
+        # --- MODIFICATION START: Generate custom 'Scrip' dynamically without pulling FinInstrmNm ---
         final_df = result[[
             'TckrSymb', 'XpryDt', 'StrkPric', 'OptnTp', 
             'FuturePrice', 'ClsPric', 'instrument_key',
-            'HghPric', 'LwPric', 'LastPric' 
-        ]].copy() 
+            'HghPric', 'LwPric', 'LastPric' # FinInstrmNm is no longer needed here
+        ]].copy() # Added .copy() to avoid SettingWithCopyWarning later
 
         final_df = final_df.rename(columns={
             'TckrSymb': 'Symbol',
@@ -434,10 +435,18 @@ def process_bhavcopy(bhav_file, df_json, target_expiry_index=0, strike_bhav_file
         })
 
         # Dynamically build the Scrip column (Symbol + YYMMDD + C/P + StrikePrice)
+        # 1. Format date to YYMMDD
         formatted_date = final_df['ExpiryDate'].dt.strftime('%y%m%d')
+        
+        # 2. Extract first letter from OptionType ('CE' -> 'C', 'PE' -> 'P')
         opt_type = final_df['OptionType'].str[0]
+        
+        # 3. Safely convert StrikePrice to string and remove ".0" at the end if present
         strike_str = final_df['StrikePrice'].astype(str).str.replace(r'\.0$', '', regex=True)
+        
+        # 4. Concatenate to form the final Scrip format
         final_df['Scrip'] = final_df['Symbol'] + formatted_date + opt_type + strike_str
+        # --- MODIFICATION END ---
 
         return final_df, target_expiry, available_expiries
 
@@ -600,18 +609,9 @@ def display_option_chain(df, access_token):
             .format(format_dict)
             .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
             hide_index=True,
-            column_order=default_visible_cols,
+            column_order=default_visible_cols, # Hides 'Scrip' by default
             use_container_width=True,
             height=1800
-        )
-        
-        # ADD YOUR CUSTOM DOWNLOAD BUTTON FOR CALLS HERE
-        csv_calls = calls_df[display_cols].to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Download Calls Data",
-            data=csv_calls,
-            file_name=f"JSTT_Calls_{get_ist_now().strftime('%Y%m%d')}.csv",
-            mime='text/csv'
         )
 
     with col2:
@@ -622,18 +622,9 @@ def display_option_chain(df, access_token):
             .format(format_dict)
             .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
             hide_index=True,
-            column_order=default_visible_cols,
+            column_order=default_visible_cols, # Hides 'Scrip' by default
             use_container_width=True,
             height=1800
-        )
-
-        # ADD YOUR CUSTOM DOWNLOAD BUTTON FOR PUTS HERE
-        csv_puts = puts_df[display_cols].to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Download Puts Data",
-            data=csv_puts,
-            file_name=f"JSTT_Puts_{get_ist_now().strftime('%Y%m%d')}.csv",
-            mime='text/csv'
         )
 
 # --- App Header & Configuration ---
