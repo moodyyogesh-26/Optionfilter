@@ -545,9 +545,8 @@ def display_option_chain(df, access_token):
     trigger_col_name = 'JSTT Trigger'
     df = df.rename(columns={'Trigger': trigger_col_name})
 
-    # --- MODIFICATION START: Added Search Box ---
     # Filter Controls
-    col_f1, col_f2, col_f3 = st.columns(3)
+    col_f1, col_f2 = st.columns(2)
     with col_f1:
         filter_view = st.radio(
             "Filter View:",
@@ -562,21 +561,13 @@ def display_option_chain(df, access_token):
             horizontal=True,
             key="strike_filter_radio"
         )
-    with col_f3:
-        search_query = st.text_input("🔍 Search Symbol:", placeholder="e.g. NIFTY, GLENMARK...")
-
-    # Apply Search Query Filter (Brings stock right in front of you)
-    if search_query:
-        df = df[df['Symbol'].str.contains(search_query.strip().upper(), na=False)]
 
     # Apply Filter View
     if filter_view == "🔥 Breakout Only (> 100%)":
         df = df[df['change %'] > 100]
     elif filter_view == "📉 Below High Only (<= 100%)":
         df = df[df['change %'] <= 100]
-    # --- MODIFICATION END ---
 
-    
     # Apply Strike Price Filter
     if strike_filter == "🎯 1000 & Above (>= 1000)":
         df = df[df['StrikePrice'] >= 1000]
