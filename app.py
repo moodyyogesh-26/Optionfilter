@@ -417,7 +417,6 @@ def process_bhavcopy(bhav_file, df_json, target_expiry_index=0, strike_bhav_file
         if result.empty and not atm_rows.empty:
             st.error("Data mismatch: Found options in Bhavcopy but couldn't find them in NSE.json. Please update NSE.json via the sidebar.")
 
-        # --- MODIFICATION START: Included 'FinInstrmNm' in final selection ---
         final_df = result[[
             'TckrSymb', 'XpryDt', 'StrkPric', 'OptnTp', 
             'FuturePrice', 'ClsPric', 'instrument_key',
@@ -432,9 +431,8 @@ def process_bhavcopy(bhav_file, df_json, target_expiry_index=0, strike_bhav_file
             'HghPric': 'HighPrice',
             'LwPric': 'LowPrice',
             'LastPric': 'LastPrice',
-            'FinInstrmNm': 'Scrip' # Renamed FinInstrmNm to Scrip
+            'FinInstrmNm': 'Scrip' 
         })
-        # --- MODIFICATION END ---
 
         return final_df, target_expiry, available_expiries
 
@@ -568,8 +566,11 @@ def display_option_chain(df, access_token):
     calls_df = calls_df.sort_values(by='change %', ascending=False)
     puts_df = puts_df.sort_values(by='change %', ascending=False)
 
-    # --- MODIFICATION START: Included 'Scrip' at the very end of the columns list ---
+    # --- MODIFICATION START: Define default_visible_cols to hide Scrip initially ---
     display_cols = ['Symbol', 'StrikePrice', trigger_col_name, 'ltp', 'change %', 'Scrip']
+    
+    # Exclude 'Scrip' from the list of columns visible by default
+    default_visible_cols = ['Symbol', 'StrikePrice', trigger_col_name, 'ltp', 'change %']
     # --- MODIFICATION END ---
     
     def color_change(val):
@@ -596,6 +597,7 @@ def display_option_chain(df, access_token):
             .format(format_dict)
             .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
             hide_index=True,
+            column_order=default_visible_cols, # Added parameter to hide 'Scrip' by default
             use_container_width=True,
             height=1800
         )
@@ -608,6 +610,7 @@ def display_option_chain(df, access_token):
             .format(format_dict)
             .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
             hide_index=True,
+            column_order=default_visible_cols, # Added parameter to hide 'Scrip' by default
             use_container_width=True,
             height=1800
         )
