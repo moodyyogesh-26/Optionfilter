@@ -417,11 +417,12 @@ def process_bhavcopy(bhav_file, df_json, target_expiry_index=0, strike_bhav_file
         if result.empty and not atm_rows.empty:
             st.error("Data mismatch: Found options in Bhavcopy but couldn't find them in NSE.json. Please update NSE.json via the sidebar.")
 
+        # --- MODIFICATION START: Generate custom 'Scrip' dynamically without pulling FinInstrmNm ---
         final_df = result[[
             'TckrSymb', 'XpryDt', 'StrkPric', 'OptnTp', 
             'FuturePrice', 'ClsPric', 'instrument_key',
-            'HghPric', 'LwPric', 'LastPric', 'FinInstrmNm'
-        ]]
+            'HghPric', 'LwPric', 'LastPric' # FinInstrmNm is no longer needed here
+        ]].copy() # Added .copy() to avoid SettingWithCopyWarning later
 
         final_df = final_df.rename(columns={
             'TckrSymb': 'Symbol',
@@ -430,9 +431,22 @@ def process_bhavcopy(bhav_file, df_json, target_expiry_index=0, strike_bhav_file
             'OptnTp': 'OptionType',
             'HghPric': 'HighPrice',
             'LwPric': 'LowPrice',
-            'LastPric': 'LastPrice',
-            'FinInstrmNm': 'Scrip' 
+            'LastPric': 'LastPrice'
         })
+
+        # Dynamically build the Scrip column (Symbol + YYMMDD + C/P + StrikePrice)
+        # 1. Format date to YYMMDD
+        formatted_date = final_df['ExpiryDate'].dt.strftime('%y%m%d')
+        
+        # 2. Extract first letter from OptionType ('CE' -> 'C', 'PE' -> 'P')
+        opt_type = final_df['OptionType'].str[0]
+        
+        # 3. Safely convert StrikePrice to string and remove ".0" at the end if present
+        strike_str = final_df['StrikePrice'].astype(str).str.replace(r'\.0$', '', regex=True)
+        
+        # 4. Concatenate to form the final Scrip format
+        final_df['Scrip'] = final_df['Symbol'] + formatted_date + opt_type + strike_str
+        # --- MODIFICATION END ---
 
         return final_df, target_expiry, available_expiries
 
@@ -566,12 +580,10 @@ def display_option_chain(df, access_token):
     calls_df = calls_df.sort_values(by='change %', ascending=False)
     puts_df = puts_df.sort_values(by='change %', ascending=False)
 
-    # --- MODIFICATION START: Define default_visible_cols to hide Scrip initially ---
     display_cols = ['Symbol', 'StrikePrice', trigger_col_name, 'ltp', 'change %', 'Scrip']
     
     # Exclude 'Scrip' from the list of columns visible by default
     default_visible_cols = ['Symbol', 'StrikePrice', trigger_col_name, 'ltp', 'change %']
-    # --- MODIFICATION END ---
     
     def color_change(val):
         if isinstance(val, (int, float)):
@@ -597,7 +609,7 @@ def display_option_chain(df, access_token):
             .format(format_dict)
             .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
             hide_index=True,
-            column_order=default_visible_cols, # Added parameter to hide 'Scrip' by default
+            column_order=default_visible_cols, # Hides 'Scrip' by default
             use_container_width=True,
             height=1800
         )
@@ -610,7 +622,7 @@ def display_option_chain(df, access_token):
             .format(format_dict)
             .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
             hide_index=True,
-            column_order=default_visible_cols, # Added parameter to hide 'Scrip' by default
+            column_order=default_visible_cols, # Hides 'Scrip' by default
             use_container_width=True,
             height=1800
         )
