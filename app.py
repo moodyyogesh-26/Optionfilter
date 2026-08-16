@@ -555,18 +555,12 @@ def display_option_chain(df, access_token):
             key="filter_view_radio"
         )
     with col_f2:
-        st.write("Strike Filter:")
-        sc1, sc2 = st.columns([2, 1])
-        with sc1:
-            strike_filter = st.radio(
-                "Strike Filter Direction:",
-                options=["All Strikes", "🎯 Above/Eq (>=)", "Below (<)"],
-                horizontal=True,
-                label_visibility="collapsed",
-                key="strike_filter_radio"
-            )
-        with sc2:
-            strike_val = st.number_input("Value", value=1000, step=100, label_visibility="collapsed", key="strike_val_input")
+        strike_filter = st.radio(
+            "Strike Filter:",
+            options=["All Strikes", "🎯 1000 & Above (>= 1000)", "Below 1000 (< 1000)"],
+            horizontal=True,
+            key="strike_filter_radio"
+        )
 
     # Apply Filter View
     if filter_view == "🔥 Breakout Only (> 100%)":
@@ -574,11 +568,12 @@ def display_option_chain(df, access_token):
     elif filter_view == "📉 Below High Only (<= 100%)":
         df = df[df['change %'] <= 100]
 
-    # Apply Strike Price Filter using the typed value
-    if strike_filter == "🎯 Above/Eq (>=)":
-        df = df[df['StrikePrice'] >= strike_val]
-    elif strike_filter == "Below (<)":
-        df = df[df['StrikePrice'] < strike_val]
+    # Apply Strike Price Filter
+    if strike_filter == "🎯 1000 & Above (>= 1000)":
+        df = df[df['StrikePrice'] >= 1000]
+    elif strike_filter == "Below 1000 (< 1000)":
+        df = df[df['StrikePrice'] < 1000]
+    
     calls_df = df[df['OptionType'] == 'CE'].copy()
     puts_df = df[df['OptionType'] == 'PE'].copy()
 
