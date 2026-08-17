@@ -651,7 +651,7 @@ def display_option_chain(df, access_token):
     # Hide both scrip columns by default in UI
     default_visible_cols = [
         'Symbol', 'StrikePrice', 'ltp', trigger_col_name, '%H', 'JSTT-C', '%C',
-        'JSTT-L', '%L', 'Diff'
+        'JSTT-L', '%L', 'Diff', 'Tradingview Scrip'
     ]
     
     def color_change(val):
