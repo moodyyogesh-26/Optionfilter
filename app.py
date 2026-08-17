@@ -22,7 +22,7 @@ def get_ist_now():
 
 # Set page configuration
 st.set_page_config(
-    page_title="JSTT Option Scanner",
+    page_title="Option Filter",
     page_icon="📈",
     layout="wide"
 )
@@ -494,7 +494,7 @@ def fetch_ltp(instrument_keys, access_token):
 def display_option_chain(df, access_token):
     st.caption(f"Last Updated: {get_ist_now().strftime('%H:%M:%S')} IST")
     if df.empty:
-        st.info("No data to display. Please upload JSTT Trigger Bhavcopy files in the sidebar.")
+        st.info("No data to display. Please upload JSTT Bhavcopy files in the sidebar.")
         return
 
     if access_token:
@@ -522,7 +522,7 @@ def display_option_chain(df, access_token):
 
     df['ltp'] = df.apply(clean_ltp, axis=1)
 
-    # JSTT Trigger trigger: Priority given to 5-day MAX high calculated from uploaded Bhavcopies
+    # JSTT: Priority given to 5-day MAX high calculated from uploaded Bhavcopies
     if 'HighPrice' in df.columns and (df['HighPrice'] > 0).any():
         df['Trigger'] = df['HighPrice']
     else:
@@ -745,9 +745,9 @@ else:
         if 'Strike_Selection' in meta and os.path.exists(FILES['Strike_Selection']):
             st.caption(f"📅 Data Date: {meta['Strike_Selection']}")
 
-        # JSTT Trigger Uploader
-        st.subheader("2. JSTT Trigger Bhavcopy")
-        uploaded_wh = st.file_uploader("Upload JSTT Trigger Bhavcopy (Multiple CSVs or ZIP)", type=['csv', 'zip'], accept_multiple_files=True, key='wh_sel')
+        # JSTT Uploader
+        st.subheader("2. JSTT Bhavcopy")
+        uploaded_wh = st.file_uploader("Upload JSTT Bhavcopy (Multiple CSVs or ZIP)", type=['csv', 'zip'], accept_multiple_files=True, key='wh_sel')
         if uploaded_wh:
             csv_content, csv_name = process_uploaded_files(uploaded_wh)
             if csv_content:
@@ -755,7 +755,7 @@ else:
                     f.write(csv_content)
                 if csv_name:
                     save_meta('JSTT_H', csv_name)
-                st.success(f"JSTT Trigger file updated from {csv_name}!")
+                st.success(f"JSTT file updated from {csv_name}!")
 
         if 'JSTT_H' in meta and os.path.exists(FILES['JSTT_H']):
             st.caption(f"📅 Data Date: {meta['JSTT_H']}")
@@ -780,6 +780,6 @@ if not nse_json_df.empty:
             display_option_chain(df_wh, access_token)
         show_JSTT_H()
     else:
-        st.warning("JSTT Trigger Bhavcopy file not found. Please upload 'JSTT Trigger Bhavcopy' (CSV/ZIP) in the sidebar.")
+        st.warning("JSTT Bhavcopy file not found. Please upload 'JSTT Bhavcopy' (CSV/ZIP) in the sidebar.")
 else:
     st.error("Critical Error: NSE.json could not be loaded.")
