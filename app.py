@@ -537,6 +537,15 @@ def display_option_chain(df, access_token):
     else:
         df['JSTT-C'] = 0.0
 
+    # JSTT-L (Last week low) extraction
+    if 'LowPrice' in df.columns:
+        df['JSTT-L'] = df['LowPrice']
+    else:
+        df['JSTT-L'] = 0.0
+
+    # Calculate Diff (Close - Low)
+    df['Diff'] = df['JSTT-C'] - df['JSTT-L']
+
     def calculate_numeric_change(row):
         try:
             trigger = float(row.get('Trigger', 0.0))
@@ -558,11 +567,25 @@ def display_option_chain(df, access_token):
             pass
         return 0.0
 
+    # Calculate %L for Last week low difference
+    def calculate_l_percent(row):
+        try:
+            low_val = float(row.get('JSTT-L', 0.0))
+            ltp = float(row.get('ltp', 0.0))
+            if low_val > 0 and ltp > 0:
+                return round((ltp / low_val) * 100, 2)
+        except Exception:
+            pass
+        return 0.0
+
     df['change_val'] = df.apply(calculate_numeric_change, axis=1)
     df['%H'] = df['change_val']
     
     df['%C_val'] = df.apply(calculate_c_percent, axis=1)
     df['%C'] = df['%C_val']
+    
+    df['%L_val'] = df.apply(calculate_l_percent, axis=1)
+    df['%L'] = df['%L_val']
 
     trigger_col_name = 'JSTT-H'
     df = df.rename(columns={'Trigger': trigger_col_name})
@@ -602,16 +625,16 @@ def display_option_chain(df, access_token):
     calls_df = calls_df.sort_values(by='%H', ascending=False)
     puts_df = puts_df.sort_values(by='%H', ascending=False)
 
-    # Define display columns including new JSTT-C and %C
-    # Define display columns in your exact requested order
+    # Define display columns including new JSTT-L, %L, and Diff
     display_cols = [
         'Symbol', 'StrikePrice', 'ltp', trigger_col_name, '%H', 'JSTT-C', '%C', 
-        'Tradingview Scrip', 'Trade Point Scrip'
+        'JSTT-L', '%L', 'Diff', 'Tradingview Scrip', 'Trade Point Scrip'
     ]
     
-    # Hide both scrip columns by default in UI (but keep the new order for the rest)
+    # Hide both scrip columns by default in UI
     default_visible_cols = [
-        'Symbol', 'StrikePrice', 'ltp', trigger_col_name, '%H', 'JSTT-C', '%C'
+        'Symbol', 'StrikePrice', 'ltp', trigger_col_name, '%H', 'JSTT-C', '%C',
+        'JSTT-L', '%L', 'Diff'
     ]
     
     def color_change(val):
@@ -625,8 +648,11 @@ def display_option_chain(df, access_token):
     format_dict = {
         '%H': '{:.2f}%',
         '%C': '{:.2f}%',
+        '%L': '{:.2f}%',
         trigger_col_name: '{:.2f}',
         'JSTT-C': '{:.2f}',
+        'JSTT-L': '{:.2f}',
+        'Diff': '{:.2f}',
         'ltp': '{:.2f}',
         'StrikePrice': '{:.2f}'
     }
@@ -636,7 +662,7 @@ def display_option_chain(df, access_token):
         st.subheader(f"Calls (CE) ({len(calls_df)})")
         st.dataframe(
             calls_df[display_cols].style
-            .map(color_change, subset=['%H', '%C'])
+            .map(color_change, subset=['%H', '%C', '%L'])
             .format(format_dict)
             .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
             hide_index=True,
@@ -649,7 +675,7 @@ def display_option_chain(df, access_token):
         st.subheader(f"Puts (PE) ({len(puts_df)})")
         st.dataframe(
             puts_df[display_cols].style
-            .map(color_change, subset=['%H', '%C'])
+            .map(color_change, subset=['%H', '%C', '%L'])
             .format(format_dict)
             .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
             hide_index=True,
