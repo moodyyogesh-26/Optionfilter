@@ -531,11 +531,11 @@ def display_option_chain(df, access_token):
         if high_cache:
             df['Trigger'] = df['instrument_key'].map(high_cache).fillna(df['Trigger'])
             
-    # JSTT-Trigger1 (Last week close) extraction
+    # JSTT-C (Last week close) extraction
     if 'ClsPric' in df.columns:
-        df['JSTT-Trigger1'] = df['ClsPric']
+        df['JSTT-C'] = df['ClsPric']
     else:
-        df['JSTT-Trigger1'] = 0.0
+        df['JSTT-C'] = 0.0
 
     def calculate_numeric_change(row):
         try:
@@ -547,10 +547,10 @@ def display_option_chain(df, access_token):
             pass
         return 0.0
 
-    # Calculate Trigger-1% for Last week close difference
+    # Calculate %C for Last week close difference
     def calculate_c_percent(row):
         try:
-            close_val = float(row.get('JSTT-Trigger1', 0.0))
+            close_val = float(row.get('JSTT-C', 0.0))
             ltp = float(row.get('ltp', 0.0))
             if close_val > 0 and ltp > 0:
                 return round((ltp / close_val) * 100, 2)
@@ -559,10 +559,10 @@ def display_option_chain(df, access_token):
         return 0.0
 
     df['change_val'] = df.apply(calculate_numeric_change, axis=1)
-    df['Trigger%'] = df['change_val']
+    df['change %'] = df['change_val']
     
-    df['Trigger-1%_val'] = df.apply(calculate_c_percent, axis=1)
-    df['Trigger-1%'] = df['Trigger-1%_val']
+    df['%C_val'] = df.apply(calculate_c_percent, axis=1)
+    df['%C'] = df['%C_val']
 
     trigger_col_name = 'JSTT Trigger'
     df = df.rename(columns={'Trigger': trigger_col_name})
@@ -586,9 +586,9 @@ def display_option_chain(df, access_token):
 
     # Apply Filter View
     if filter_view == "🔥 Breakout Only (> 100%)":
-        df = df[df['Trigger%'] > 100]
+        df = df[df['change %'] > 100]
     elif filter_view == "📉 Below High Only (<= 100%)":
-        df = df[df['Trigger%'] <= 100]
+        df = df[df['change %'] <= 100]
 
     # Apply Strike Price Filter
     if strike_filter == "🎯 1000 & Above (>= 1000)":
@@ -599,18 +599,19 @@ def display_option_chain(df, access_token):
     calls_df = df[df['OptionType'] == 'CE'].copy()
     puts_df = df[df['OptionType'] == 'PE'].copy()
 
-    calls_df = calls_df.sort_values(by='Trigger%', ascending=False)
-    puts_df = puts_df.sort_values(by='Trigger%', ascending=False)
+    calls_df = calls_df.sort_values(by='change %', ascending=False)
+    puts_df = puts_df.sort_values(by='change %', ascending=False)
 
+    # Define display columns including new JSTT-C and %C
     # Define display columns in your exact requested order
     display_cols = [
-        'Symbol', 'StrikePrice', 'ltp', trigger_col_name, 'Trigger%', 'JSTT-Trigger1', 'Trigger-1%', 
+        'Symbol', 'StrikePrice', 'ltp', trigger_col_name, 'change %', 'JSTT-C', '%C', 
         'Tradingview Scrip', 'Trade Point Scrip'
     ]
     
     # Hide both scrip columns by default in UI (but keep the new order for the rest)
     default_visible_cols = [
-        'Symbol', 'StrikePrice', 'ltp', trigger_col_name, 'Trigger%', 'JSTT-Trigger1', 'Trigger-1%'
+        'Symbol', 'StrikePrice', 'ltp', trigger_col_name, 'change %', 'JSTT-C', '%C'
     ]
     
     def color_change(val):
@@ -622,10 +623,10 @@ def display_option_chain(df, access_token):
         return ''
 
     format_dict = {
-        'Trigger%': '{:.2f}%',
-        'Trigger-1%': '{:.2f}%',
+        'change %': '{:.2f}%',
+        '%C': '{:.2f}%',
         trigger_col_name: '{:.2f}',
-        'JSTT-Trigger1': '{:.2f}',
+        'JSTT-C': '{:.2f}',
         'ltp': '{:.2f}',
         'StrikePrice': '{:.2f}'
     }
@@ -635,7 +636,7 @@ def display_option_chain(df, access_token):
         st.subheader(f"Calls (CE) ({len(calls_df)})")
         st.dataframe(
             calls_df[display_cols].style
-            .map(color_change, subset=['Trigger%', 'Trigger1 %'])
+            .map(color_change, subset=['change %', '%C'])
             .format(format_dict)
             .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
             hide_index=True,
@@ -648,7 +649,7 @@ def display_option_chain(df, access_token):
         st.subheader(f"Puts (PE) ({len(puts_df)})")
         st.dataframe(
             puts_df[display_cols].style
-            .map(color_change, subset=['Trigger%', 'Trigger-1%'])
+            .map(color_change, subset=['change %', '%C'])
             .format(format_dict)
             .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
             hide_index=True,
