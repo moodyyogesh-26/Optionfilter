@@ -591,7 +591,7 @@ def display_option_chain(df, access_token):
     df = df.rename(columns={'Trigger': trigger_col_name})
 
     # Filter Controls
-    col_f1, col_f2 = st.columns(2)
+    col_f1, col_f2, col_f3 = st.columns(3)
     with col_f1:
         filter_view = st.radio(
             "Filter View:",
@@ -605,6 +605,14 @@ def display_option_chain(df, access_token):
             options=["All Strikes", "🎯 1000 & Above (>= 1000)", "Below 1000 (< 1000)"],
             horizontal=True,
             key="strike_filter_radio"
+        )
+    with col_f3:
+        color_toggle = st.radio(
+            "Color Highlight:",
+            options=["On", "Off"],
+            horizontal=True,
+            index=0,
+            key="color_toggle_radio"
         )
 
     # Apply Filter View
@@ -638,6 +646,9 @@ def display_option_chain(df, access_token):
     ]
     
     def color_change(val):
+        if color_toggle == "Off":
+            return ''
+            
         if isinstance(val, (int, float)):
             if val >= 100:
                 return 'background-color: darkgreen; color: white'
