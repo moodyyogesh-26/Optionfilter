@@ -71,9 +71,11 @@ META_FILE = os.path.join(DATA_DIR, 'meta.json')
 LTP_CACHE_FILE = os.path.join(DATA_DIR, 'ltp_cache.json')
 JSTT_H_CACHE_FILE = os.path.join(DATA_DIR, 'JSTT_H_cache.json')
 
+# Updated FILES dictionary to include Lot Size
 FILES = {
     'JSTT_H': os.path.join(DATA_DIR, 'JSTT_H.csv'),
-    'Strike_Selection': os.path.join(DATA_DIR, 'strike_selection.csv')
+    'Strike_Selection': os.path.join(DATA_DIR, 'strike_selection.csv'),
+    'Lot_Size': os.path.join(DATA_DIR, 'lot_size.csv')
 }
 
 def get_base64_image(image_path):
@@ -522,6 +524,31 @@ def display_option_chain(df, access_token):
 
     df['ltp'] = df.apply(clean_ltp, axis=1)
 
+    # --- Load and Map Lot Size ---
+    def get_lot_sizes():
+        lot_file = FILES.get('Lot_Size')
+        if lot_file and os.path.exists(lot_file):
+            try:
+                ldf = pd.read_csv(lot_file)
+                ldf.columns = ldf.columns.str.strip().str.upper()
+                sym_col = next((c for c in ldf.columns if c in ['SYMBOL', 'UNDERLYING', 'TCKRSYMB']), None)
+                lot_col = next((c for c in ldf.columns if 'LOT' in c or 'SIZE' in c), None)
+                if sym_col and lot_col:
+                    # Sort by expiry/month if available to guarantee latest (nearest) month is at the top
+                    month_col = next((c for c in ldf.columns if 'MONTH' in c or 'EXPIRY' in c), None)
+                    if month_col:
+                        ldf = ldf.sort_values(month_col)
+                    # Drop duplicates keeping the first occurrence (latest month)
+                    ldf = ldf.drop_duplicates(subset=[sym_col], keep='first')
+                    return dict(zip(ldf[sym_col], ldf[lot_col]))
+            except Exception:
+                pass
+        return {}
+
+    lot_size_map = get_lot_sizes()
+    # Map the Symbol to the Lot Size, defaulting to 0 if not found
+    df['Lot Size'] = df['Symbol'].map(lot_size_map).fillna(0).astype(int)
+
     # JSTT: Priority given to 5-day MAX high calculated from uploaded Bhavcopies
     if 'HighPrice' in df.columns and (df['HighPrice'] > 0).any():
         df['Trigger'] = df['HighPrice']
@@ -604,7 +631,7 @@ def display_option_chain(df, access_token):
         strike_filter = st.selectbox(
             "Strike Filter:",
             options=["All Strikes", "🎯 1000 & Above (>= 1000)", "Below 1000 (< 1000)"],
-            index=1,  # <--- Add this line to set the default
+            index=1,
             key="strike_filter_radio"
         )
     with col_f3:
@@ -642,13 +669,13 @@ def display_option_chain(df, access_token):
     calls_df = calls_df.sort_values(by='%H', ascending=False)
     puts_df = puts_df.sort_values(by='%H', ascending=False)
 
-    # Define display columns including new JSTT-L, %L, and Diff
+    # Define display columns including new JSTT-L, %L, Diff, and Lot Size
     display_cols = [
         'Symbol', 'StrikePrice', 'ltp', trigger_col_name, '%H', 'JSTT-C', '%C', 
-        'JSTT-L', '%L', 'Diff', 'Tradingview Scrip', 'Trade Point Scrip'
+        'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'Trade Point Scrip'
     ]
     
-    # Hide both scrip columns by default in UI
+    # Hide Trade Point Scrip and Lot Size by default. Keep Tradingview Scrip visible default.
     default_visible_cols = [
         'Symbol', 'StrikePrice', 'ltp', trigger_col_name, '%H', 'JSTT-C', '%C',
         'JSTT-L', '%L', 'Diff', 'Tradingview Scrip'
@@ -674,7 +701,8 @@ def display_option_chain(df, access_token):
         'JSTT-L': '{:.2f}',
         'Diff': '{:.2f}',
         'ltp': '{:.2f}',
-        'StrikePrice': '{:.2f}'
+        'StrikePrice': '{:.2f}',
+        'Lot Size': '{:d}'
     }
 
     if layout_view == "↔️ Side-by-Side":
@@ -832,6 +860,26 @@ else:
 
         if 'JSTT_H' in meta and os.path.exists(FILES['JSTT_H']):
             st.caption(f"📅 Data Date: {meta['JSTT_H']}")
+            
+        # ----------------------------------------------------
+        # NEW: Lot Size Uploader (3. Lot Size File)
+        # ----------------------------------------------------
+        st.subheader("3. Lot Size File")
+        uploaded_lot = st.file_uploader("Upload Dhan Lot Size File (CSV)", type=['csv'], key='lot_size_upload')
+        if uploaded_lot is not None:
+            try:
+                csv_bytes = uploaded_lot.read()
+                if csv_bytes:
+                    with open(FILES['Lot_Size'], 'wb') as f:
+                        f.write(csv_bytes)
+                    save_meta('Lot_Size', getattr(uploaded_lot, 'name', 'lot_size.csv'))
+                    st.success(f"Lot Size file updated from {getattr(uploaded_lot, 'name', 'lot_size.csv')}!")
+            except Exception as e:
+                st.error(f"Error reading Lot Size file: {e}")
+
+        if 'Lot_Size' in meta and os.path.exists(FILES['Lot_Size']):
+            st.caption(f"📅 Data File: {meta['Lot_Size']}")
+        # ----------------------------------------------------
 
         st.markdown("---")
         st.header("Auto Refresh")
