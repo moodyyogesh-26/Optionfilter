@@ -590,23 +590,29 @@ def display_option_chain(df, access_token):
     trigger_col_name = 'JSTT-H'
     df = df.rename(columns={'Trigger': trigger_col_name})
 
-    # Filter Controls
-    col_f1, col_f2, col_f3 = st.columns(3)
+    # --- NEW ORGANIZED DASHBOARD CONTROLS ---
+    st.markdown("---")
+    col_f1, col_f2, col_f3, col_f4 = st.columns(4)
+    
     with col_f1:
-        filter_view = st.radio(
+        filter_view = st.selectbox(
             "Filter View:",
             options=["All Options", "🔥 Breakout Only (> 100%)", "📉 Below High Only (<= 100%)"],
-            horizontal=True,
             key="filter_view_radio"
         )
     with col_f2:
-        strike_filter = st.radio(
+        strike_filter = st.selectbox(
             "Strike Filter:",
             options=["All Strikes", "🎯 1000 & Above (>= 1000)", "Below 1000 (< 1000)"],
-            horizontal=True,
             key="strike_filter_radio"
         )
     with col_f3:
+        layout_view = st.selectbox(
+            "Table Layout:",
+            options=["↔️ Side-by-Side", "📈 Maximize Calls (CE)", "📉 Maximize Puts (PE)"],
+            key="table_layout_radio"
+        )
+    with col_f4:
         color_toggle = st.radio(
             "Color Highlight:",
             options=["On", "Off"],
@@ -614,6 +620,8 @@ def display_option_chain(df, access_token):
             index=0,
             key="color_toggle_radio"
         )
+    st.markdown("---")
+    # ----------------------------------------
 
     # Apply Filter View
     if filter_view == "🔥 Breakout Only (> 100%)":
@@ -667,15 +675,6 @@ def display_option_chain(df, access_token):
         'ltp': '{:.2f}',
         'StrikePrice': '{:.2f}'
     }
-
-    # Table Layout Toggle
-    st.write("") 
-    layout_view = st.radio(
-        "Table Layout:",
-        options=["↔️ Side-by-Side", "📈 Maximize Calls (CE)", "📉 Maximize Puts (PE)"],
-        horizontal=True,
-        key="table_layout_radio"
-    )
 
     if layout_view == "↔️ Side-by-Side":
         col1, col2 = st.columns(2)
