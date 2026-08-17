@@ -590,19 +590,23 @@ def display_option_chain(df, access_token):
     trigger_col_name = 'JSTT-H'
     df = df.rename(columns={'Trigger': trigger_col_name})
 
-    def color_change(val):
-        # If the radio button is set to 'Off', return no color formatting
-        if color_toggle == "Off":
-            return ''
-            
-        if isinstance(val, (int, float)):
-            if val >= 100:
-                return 'background-color: darkgreen; color: white'
-            elif val >= 90:
-                return 'background-color: lightgreen; color: black'
-        return ''
+    # Filter Controls
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        filter_view = st.radio(
+            "Filter View:",
+            options=["All Options", "🔥 Breakout Only (> 100%)", "📉 Below High Only (<= 100%)"],
+            horizontal=True,
+            key="filter_view_radio"
+        )
+    with col_f2:
+        strike_filter = st.radio(
+            "Strike Filter:",
+            options=["All Strikes", "🎯 1000 & Above (>= 1000)", "Below 1000 (< 1000)"],
+            horizontal=True,
+            key="strike_filter_radio"
+        )
 
-    
     # Apply Filter View
     if filter_view == "🔥 Breakout Only (> 100%)":
         df = df[df['%H'] > 100]
