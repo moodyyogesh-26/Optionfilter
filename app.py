@@ -619,37 +619,48 @@ def display_option_chain(df, access_token):
 
     # --- NEW ORGANIZED DASHBOARD CONTROLS ---
     st.markdown("---")
-    col_f1, col_f2, col_f3, col_f4, col_f5 = st.columns(5)
+    col_f1, col_f2, col_f3, col_f4, col_f5, col_f6, col_f7 = st.columns([1, 1, 1, 1, 1, 1.2, 0.8])
     
     with col_f1:
-        filter_view = st.selectbox(
-            "Filter View:",
-            options=["All Options", "🔥 Breakout Only (> 100%)", "📉 Below High Only (<= 100%)"],
-            key="filter_view_radio"
+        filter_metric = st.selectbox(
+            "Filter Metric:",
+            options=["%H", "%C", "%L"],
+            index=0,
+            key="filter_metric_select"
         )
     with col_f2:
-        # Editable Strike Filter (Greater than or equal to)
+        min_pct_input = st.text_input(
+            "Min % (>=):",
+            value="",
+            help="e.g., 100 (Leave empty to ignore)"
+        )
+    with col_f3:
+        max_pct_input = st.text_input(
+            "Max % (<=):",
+            value="",
+            help="e.g., 200 (Leave empty to ignore)"
+        )
+    with col_f4:
         min_strike_input = st.text_input(
             "Min Strike (>=):",
             value="1000",
             help="Leave empty for All Strikes"
         )
-    with col_f3:
-        # Editable Lot Size Filter (Less than)
+    with col_f5:
         max_lot_input = st.text_input(
             "Max Lot Size (<):",
             value="",
             help="Leave empty for All Lot Sizes"
         )
-    with col_f4:
+    with col_f6:
         layout_view = st.selectbox(
             "Table Layout:",
             options=["↔️ Side-by-Side", "📈 Maximize Calls (CE)", "📉 Maximize Puts (PE)"],
             key="table_layout_radio"
         )
-    with col_f5:
+    with col_f7:
         color_toggle = st.radio(
-            "Color Highlight:",
+            "Color:",
             options=["On", "Off"],
             horizontal=True,
             index=0,
@@ -658,11 +669,20 @@ def display_option_chain(df, access_token):
     st.markdown("---")
     # ----------------------------------------
 
-    # Apply Filter View
-    if filter_view == "🔥 Breakout Only (> 100%)":
-        df = df[df['%H'] > 100]
-    elif filter_view == "📉 Below High Only (<= 100%)":
-        df = df[df['%H'] <= 100]
+    # Apply % Range Filter
+    if min_pct_input.strip():
+        try:
+            min_pct_val = float(min_pct_input.strip())
+            df = df[df[filter_metric] >= min_pct_val]
+        except ValueError:
+            pass
+            
+    if max_pct_input.strip():
+        try:
+            max_pct_val = float(max_pct_input.strip())
+            df = df[df[filter_metric] <= max_pct_val]
+        except ValueError:
+            pass
 
     # Apply Strike Price Filter
     if min_strike_input.strip():
