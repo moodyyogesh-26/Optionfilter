@@ -605,13 +605,13 @@ def display_option_chain(df, access_token):
     # Define display columns including new JSTT-C and %C
     # Define display columns in your exact requested order
     display_cols = [
-        'Symbol', 'StrikePrice', 'ltp', trigger_col_name, '%H', 'JSTT-C', '%C', 
+        'Symbol', 'StrikePrice', 'ltp', trigger_col_name, 'change %', 'JSTT-C', '%C', 
         'Tradingview Scrip', 'Trade Point Scrip'
     ]
     
     # Hide both scrip columns by default in UI (but keep the new order for the rest)
     default_visible_cols = [
-        'Symbol', 'StrikePrice', 'ltp', trigger_col_name, '%H', 'JSTT-C', '%C'
+        'Symbol', 'StrikePrice', 'ltp', trigger_col_name, 'change %', 'JSTT-C', '%C'
     ]
     
     def color_change(val):
