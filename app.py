@@ -699,7 +699,7 @@ def display_option_chain(df, access_token):
     # Hide Trade Point Scrip and Lot Size by default. Keep Tradingview Scrip visible default.
     default_visible_cols = [
         'Symbol', 'StrikePrice', 'ltp', trigger_col_name, '%H', 'JSTT-C', '%C',
-        'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip'
+        'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'Trade Point Scrip'
     ]
     
    # ADD THIS LINE: Automatically remove missing columns from defaults
