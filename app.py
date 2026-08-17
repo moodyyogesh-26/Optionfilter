@@ -689,13 +689,13 @@ def display_option_chain(df, access_token):
 
     # Define display columns including new JSTT-L, %L, Diff, and Lot Size
     display_cols = [
-        'Symbol', 'StrikePrice', 'LTP', trigger_col_name, '%H', 'JSTT-C', '%C', 
+        'Symbol', 'StrikePrice', 'ltp', trigger_col_name, '%H', 'JSTT-C', '%C', 
         'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'TradePoint Scrip'
     ]
     
     # Hide Trade Point Scrip and Lot Size by default. Keep Tradingview Scrip visible default.
     default_visible_cols = [
-        'Symbol', 'StrikePrice', 'LTP', trigger_col_name, '%H', 'JSTT-C', '%C',
+        'Symbol', 'StrikePrice', 'ltp', trigger_col_name, '%H', 'JSTT-C', '%C',
         'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'TradePoint Scrip'
     ]
     
