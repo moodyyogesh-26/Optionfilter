@@ -619,53 +619,34 @@ def display_option_chain(df, access_token):
 
     # --- NEW ORGANIZED DASHBOARD CONTROLS ---
     st.markdown("---")
-    col_f1, col_f2, col_f3, col_f4, col_f5, col_f6, col_f7 = st.columns([1, 1, 1, 1, 1, 1.2, 0.8])
+    
+    # Reduced main columns to visually condense layout
+    col_f1, col_f2, col_f3, col_f4, col_f5 = st.columns([2.8, 1, 1, 1.4, 0.8])
     
     with col_f1:
-        filter_metric = st.selectbox(
-            "Filter Metric:",
-            options=["%H", "%C", "%L"],
-            index=0,
-            key="filter_metric_select"
-        )
+        # Merged the Metric, Min %, and Max % into nested columns to integrate them tightly
+        sc1, sc2, sc3 = st.columns(3)
+        filter_metric = sc1.selectbox("Metric:", options=["%H", "%C", "%L"], index=0, key="filter_metric_select")
+        min_pct_input = sc2.text_input("Min % (>=):", value="", placeholder="e.g. 100")
+        max_pct_input = sc3.text_input("Max % (<=):", value="", placeholder="e.g. 200")
+        
     with col_f2:
-        min_pct_input = st.text_input(
-            "Min % (>=):",
-            value="",
-            help="e.g., 100 (Leave empty to ignore)"
-        )
+        min_strike_input = st.text_input("Min Strike:", value="1000", placeholder=">= 1000")
+        
     with col_f3:
-        max_pct_input = st.text_input(
-            "Max % (<=):",
-            value="",
-            help="e.g., 200 (Leave empty to ignore)"
-        )
+        max_lot_input = st.text_input("Max Lot:", value="", placeholder="< Max Lot")
+        
     with col_f4:
-        min_strike_input = st.text_input(
-            "Min Strike (>=):",
-            value="1000",
-            help="Leave empty for All Strikes"
-        )
-    with col_f5:
-        max_lot_input = st.text_input(
-            "Max Lot Size (<):",
-            value="",
-            help="Leave empty for All Lot Sizes"
-        )
-    with col_f6:
+        # Shortened the layout text to make it fit easily
         layout_view = st.selectbox(
-            "Table Layout:",
-            options=["↔️ Side-by-Side", "📈 Maximize Calls (CE)", "📉 Maximize Puts (PE)"],
+            "Layout:",
+            options=["↔️ Split", "📈 CE Max", "📉 PE Max"],
             key="table_layout_radio"
         )
-    with col_f7:
-        color_toggle = st.radio(
-            "Color:",
-            options=["On", "Off"],
-            horizontal=True,
-            index=0,
-            key="color_toggle_radio"
-        )
+        
+    with col_f5:
+        color_toggle = st.radio("Color:", options=["On", "Off"], horizontal=True, key="color_toggle_radio")
+        
     st.markdown("---")
     # ----------------------------------------
 
@@ -742,7 +723,8 @@ def display_option_chain(df, access_token):
         'Lot Size': '{:d}'
     }
 
-    if layout_view == "↔️ Side-by-Side":
+    # Render layout based on the shortened select box selection
+    if layout_view == "↔️ Split":
         col1, col2 = st.columns(2)
         with col1:
             st.subheader(f"Calls (CE) ({len(calls_df)})")
@@ -770,7 +752,7 @@ def display_option_chain(df, access_token):
                 height=1800
             )
             
-    elif layout_view == "📈 Maximize Calls (CE)":
+    elif layout_view == "📈 CE Max":
         st.subheader(f"Calls (CE) ({len(calls_df)})")
         st.dataframe(
             calls_df[display_cols].style
@@ -783,7 +765,7 @@ def display_option_chain(df, access_token):
             height=1800
         )
         
-    elif layout_view == "📉 Maximize Puts (PE)":
+    elif layout_view == "📉 PE Max":
         st.subheader(f"Puts (PE) ({len(puts_df)})")
         st.dataframe(
             puts_df[display_cols].style
