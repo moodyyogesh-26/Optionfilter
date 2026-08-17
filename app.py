@@ -668,8 +668,44 @@ def display_option_chain(df, access_token):
         'StrikePrice': '{:.2f}'
     }
 
-    col1, col2 = st.columns(2)
-    with col1:
+    # Table Layout Toggle
+    st.write("") 
+    layout_view = st.radio(
+        "Table Layout:",
+        options=["↔️ Side-by-Side", "📈 Maximize Calls (CE)", "📉 Maximize Puts (PE)"],
+        horizontal=True,
+        key="table_layout_radio"
+    )
+
+    if layout_view == "↔️ Side-by-Side":
+        col1, col2 = st.columns(2)
+        with col1:
+            st.subheader(f"Calls (CE) ({len(calls_df)})")
+            st.dataframe(
+                calls_df[display_cols].style
+                .map(color_change, subset=['%H', '%C', '%L'])
+                .format(format_dict)
+                .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
+                hide_index=True,
+                column_order=default_visible_cols,
+                use_container_width=True,
+                height=1800
+            )
+
+        with col2:
+            st.subheader(f"Puts (PE) ({len(puts_df)})")
+            st.dataframe(
+                puts_df[display_cols].style
+                .map(color_change, subset=['%H', '%C', '%L'])
+                .format(format_dict)
+                .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
+                hide_index=True,
+                column_order=default_visible_cols,
+                use_container_width=True,
+                height=1800
+            )
+            
+    elif layout_view == "📈 Maximize Calls (CE)":
         st.subheader(f"Calls (CE) ({len(calls_df)})")
         st.dataframe(
             calls_df[display_cols].style
@@ -681,8 +717,8 @@ def display_option_chain(df, access_token):
             use_container_width=True,
             height=1800
         )
-
-    with col2:
+        
+    elif layout_view == "📉 Maximize Puts (PE)":
         st.subheader(f"Puts (PE) ({len(puts_df)})")
         st.dataframe(
             puts_df[display_cols].style
