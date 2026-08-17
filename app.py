@@ -696,7 +696,7 @@ def display_option_chain(df, access_token):
     # Hide Trade Point Scrip and Lot Size by default. Keep Tradingview Scrip visible default.
     default_visible_cols = [
         'Symbol', 'StrikePrice', 'ltp', trigger_col_name, '%H', 'JSTT-C', '%C',
-        'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'TradePoint Scrip'
+        'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip'
     ]
     
     def color_change(val):
