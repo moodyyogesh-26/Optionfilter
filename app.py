@@ -69,10 +69,10 @@ if not os.path.exists(DATA_DIR):
 TOKEN_FILE = os.path.join(DATA_DIR, 'token.json')
 META_FILE = os.path.join(DATA_DIR, 'meta.json')
 LTP_CACHE_FILE = os.path.join(DATA_DIR, 'ltp_cache.json')
-JSTT-H_CACHE_FILE = os.path.join(DATA_DIR, 'JSTT-H_cache.json')
+JSTT_H_CACHE_FILE = os.path.join(DATA_DIR, 'JSTT_H_cache.json')
 
 FILES = {
-    'JSTT-H': os.path.join(DATA_DIR, 'JSTT-H.csv'),
+    'JSTT_H': os.path.join(DATA_DIR, 'JSTT_H.csv'),
     'Strike_Selection': os.path.join(DATA_DIR, 'strike_selection.csv')
 }
 
