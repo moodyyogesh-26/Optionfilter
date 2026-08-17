@@ -433,7 +433,6 @@ def process_bhavcopy(bhav_file, df_json, target_expiry_index=0, strike_bhav_file
             'LastPric': 'LastPrice'
         })
 
-        # --- MODIFICATION START: Build Tradingview Scrip and Trade Point Scrip ---
         # Shared strike formatting: remove trailing '.0' (e.g. 415.0 -> 415) while keeping decimals (e.g. 172.5)
         strike_str = final_df['StrikePrice'].astype(str).str.replace(r'\.0$', '', regex=True)
 
@@ -450,7 +449,6 @@ def process_bhavcopy(bhav_file, df_json, target_expiry_index=0, strike_bhav_file
             final_df['OptionType'] + " " + 
             strike_str
         )
-        # --- MODIFICATION END ---
 
         return final_df, target_expiry, available_expiries
 
@@ -532,6 +530,12 @@ def display_option_chain(df, access_token):
         high_cache = load_JSTT_Trigger_cache()
         if high_cache:
             df['Trigger'] = df['instrument_key'].map(high_cache).fillna(df['Trigger'])
+            
+    # JSTT-C (Last week close) extraction
+    if 'ClsPric' in df.columns:
+        df['JSTT-C'] = df['ClsPric']
+    else:
+        df['JSTT-C'] = 0.0
 
     def calculate_numeric_change(row):
         try:
@@ -543,8 +547,22 @@ def display_option_chain(df, access_token):
             pass
         return 0.0
 
+    # Calculate %C for Last week close difference
+    def calculate_c_percent(row):
+        try:
+            close_val = float(row.get('JSTT-C', 0.0))
+            ltp = float(row.get('ltp', 0.0))
+            if close_val > 0 and ltp > 0:
+                return round((ltp / close_val) * 100, 2)
+        except Exception:
+            pass
+        return 0.0
+
     df['change_val'] = df.apply(calculate_numeric_change, axis=1)
     df['change %'] = df['change_val']
+    
+    df['%C_val'] = df.apply(calculate_c_percent, axis=1)
+    df['%C'] = df['%C_val']
 
     trigger_col_name = 'JSTT Trigger'
     df = df.rename(columns={'Trigger': trigger_col_name})
@@ -584,15 +602,14 @@ def display_option_chain(df, access_token):
     calls_df = calls_df.sort_values(by='change %', ascending=False)
     puts_df = puts_df.sort_values(by='change %', ascending=False)
 
-    # --- MODIFICATION START: Define display columns and default visible columns ---
+    # Define display columns including new JSTT-C and %C
     display_cols = [
-        'Symbol', 'StrikePrice', trigger_col_name, 'ltp', 'change %', 
+        'Symbol', 'StrikePrice', trigger_col_name, 'JSTT-C', 'ltp', 'change %', '%C', 
         'Tradingview Scrip', 'Trade Point Scrip'
     ]
     
     # Hide both scrip columns by default in UI
-    default_visible_cols = ['Symbol', 'StrikePrice', trigger_col_name, 'ltp', 'change %']
-    # --- MODIFICATION END ---
+    default_visible_cols = ['Symbol', 'StrikePrice', trigger_col_name, 'JSTT-C', 'ltp', 'change %', '%C']
     
     def color_change(val):
         if isinstance(val, (int, float)):
@@ -604,7 +621,9 @@ def display_option_chain(df, access_token):
 
     format_dict = {
         'change %': '{:.2f}%',
+        '%C': '{:.2f}%',
         trigger_col_name: '{:.2f}',
+        'JSTT-C': '{:.2f}',
         'ltp': '{:.2f}',
         'StrikePrice': '{:.2f}'
     }
@@ -614,7 +633,7 @@ def display_option_chain(df, access_token):
         st.subheader(f"Calls (CE) ({len(calls_df)})")
         st.dataframe(
             calls_df[display_cols].style
-            .map(color_change, subset=['change %'])
+            .map(color_change, subset=['change %', '%C'])
             .format(format_dict)
             .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
             hide_index=True,
@@ -627,7 +646,7 @@ def display_option_chain(df, access_token):
         st.subheader(f"Puts (PE) ({len(puts_df)})")
         st.dataframe(
             puts_df[display_cols].style
-            .map(color_change, subset=['change %'])
+            .map(color_change, subset=['change %', '%C'])
             .format(format_dict)
             .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
             hide_index=True,
