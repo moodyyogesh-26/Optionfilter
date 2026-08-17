@@ -604,6 +604,7 @@ def display_option_chain(df, access_token):
         strike_filter = st.selectbox(
             "Strike Filter:",
             options=["All Strikes", "🎯 1000 & Above (>= 1000)", "Below 1000 (< 1000)"],
+            index=1,  # <--- Add this line to set the default
             key="strike_filter_radio"
         )
     with col_f3:
