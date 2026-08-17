@@ -619,7 +619,7 @@ def display_option_chain(df, access_token):
 
     # --- NEW ORGANIZED DASHBOARD CONTROLS ---
     st.markdown("---")
-    col_f1, col_f2, col_f3, col_f4 = st.columns(4)
+    col_f1, col_f2, col_f3, col_f4, col_f5 = st.columns(5)
     
     with col_f1:
         filter_view = st.selectbox(
@@ -628,19 +628,26 @@ def display_option_chain(df, access_token):
             key="filter_view_radio"
         )
     with col_f2:
-        strike_filter = st.selectbox(
-            "Strike Filter:",
-            options=["All Strikes", "🎯 1000 & Above (>= 1000)", "Below 1000 (< 1000)"],
-            index=1,
-            key="strike_filter_radio"
+        # Editable Strike Filter (Greater than or equal to)
+        min_strike_input = st.text_input(
+            "Min Strike (>=):",
+            value="1000",
+            help="Leave empty for All Strikes"
         )
     with col_f3:
+        # Editable Lot Size Filter (Less than)
+        max_lot_input = st.text_input(
+            "Max Lot Size (<):",
+            value="",
+            help="Leave empty for All Lot Sizes"
+        )
+    with col_f4:
         layout_view = st.selectbox(
             "Table Layout:",
             options=["↔️ Side-by-Side", "📈 Maximize Calls (CE)", "📉 Maximize Puts (PE)"],
             key="table_layout_radio"
         )
-    with col_f4:
+    with col_f5:
         color_toggle = st.radio(
             "Color Highlight:",
             options=["On", "Off"],
@@ -658,10 +665,20 @@ def display_option_chain(df, access_token):
         df = df[df['%H'] <= 100]
 
     # Apply Strike Price Filter
-    if strike_filter == "🎯 1000 & Above (>= 1000)":
-        df = df[df['StrikePrice'] >= 1000]
-    elif strike_filter == "Below 1000 (< 1000)":
-        df = df[df['StrikePrice'] < 1000]
+    if min_strike_input.strip():
+        try:
+            min_strike_val = float(min_strike_input.strip())
+            df = df[df['StrikePrice'] >= min_strike_val]
+        except ValueError:
+            pass # Ignore if user types text instead of a number
+
+    # Apply Lot Size Filter
+    if max_lot_input.strip():
+        try:
+            max_lot_val = float(max_lot_input.strip())
+            df = df[df['Lot Size'] < max_lot_val]
+        except ValueError:
+            pass # Ignore if user types text instead of a number
 
     calls_df = df[df['OptionType'] == 'CE'].copy()
     puts_df = df[df['OptionType'] == 'PE'].copy()
@@ -678,7 +695,7 @@ def display_option_chain(df, access_token):
     # Hide Trade Point Scrip and Lot Size by default. Keep Tradingview Scrip visible default.
     default_visible_cols = [
         'Symbol', 'StrikePrice', 'ltp', trigger_col_name, '%H', 'JSTT-C', '%C',
-        'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip'
+        'JSTT-L', '%L', 'Diff', 'Tradingview Scrip'
     ]
     
     def color_change(val):
