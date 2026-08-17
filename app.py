@@ -564,7 +564,7 @@ def display_option_chain(df, access_token):
     df['%C_val'] = df.apply(calculate_c_percent, axis=1)
     df['%C'] = df['%C_val']
 
-    trigger_col_name = 'JSTT Trigger'
+    trigger_col_name = 'JSTT-H'
     df = df.rename(columns={'Trigger': trigger_col_name})
 
     # Filter Controls
@@ -605,7 +605,7 @@ def display_option_chain(df, access_token):
     # Define display columns including new JSTT-C and %C
     # Define display columns in your exact requested order
     display_cols = [
-        'Symbol', 'StrikePrice', 'ltp', trigger_col_name, 'change %', 'JSTT-C', '%C', 
+        'Symbol', 'StrikePrice', 'ltp', trigger_col_name, '%H', 'JSTT-C', '%C', 
         'Tradingview Scrip', 'Trade Point Scrip'
     ]
     
