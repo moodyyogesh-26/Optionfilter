@@ -626,12 +626,12 @@ def display_option_chain(df, access_token):
     with col_f1:
         # Merged the Metric, Min %, and Max % into nested columns to integrate them tightly
         sc1, sc2, sc3 = st.columns(3)
-        filter_metric = sc1.selectbox("Metric:", options=["%H", "%C", "%L"], index=0, key="filter_metric_select")
-        min_pct_input = sc2.text_input("Min % (>=):", value="", placeholder="e.g. 100")
-        max_pct_input = sc3.text_input("Max % (<=):", value="", placeholder="e.g. 200")
+        filter_metric = sc1.selectbox("Filter View:", options=["%H", "%C", "%L"], index=1, key="filter_metric_select")
+        min_pct_input = sc2.text_input("Min % (>=):", value="", placeholder="e.g. 80")
+        max_pct_input = sc3.text_input("Max % (<=):", value="", placeholder="e.g. 120")
         
     with col_f2:
-        min_strike_input = st.text_input("Min Strike:", value="1000", placeholder=">= 1000")
+        min_strike_input = st.text_input("Min Price:", value="1000", placeholder=">= StrikePrice")
         
     with col_f3:
         max_lot_input = st.text_input("Max Lot:", value="", placeholder="< Max Lot")
@@ -689,14 +689,14 @@ def display_option_chain(df, access_token):
 
     # Define display columns including new JSTT-L, %L, Diff, and Lot Size
     display_cols = [
-        'Symbol', 'StrikePrice', 'ltp', trigger_col_name, '%H', 'JSTT-C', '%C', 
-        'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'Trade Point Scrip'
+        'Symbol', 'StrikePrice', 'LTP', trigger_col_name, '%H', 'JSTT-C', '%C', 
+        'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'TradePoint Scrip'
     ]
     
     # Hide Trade Point Scrip and Lot Size by default. Keep Tradingview Scrip visible default.
     default_visible_cols = [
-        'Symbol', 'StrikePrice', 'ltp', trigger_col_name, '%H', 'JSTT-C', '%C',
-        'JSTT-L', '%L', 'Diff', 'Tradingview Scrip'
+        'Symbol', 'StrikePrice', 'LTP', trigger_col_name, '%H', 'JSTT-C', '%C',
+        'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'TradePoint Scrip'
     ]
     
     def color_change(val):
