@@ -690,14 +690,20 @@ def display_option_chain(df, access_token):
     # Define display columns including new JSTT-L, %L, Diff, and Lot Size
     display_cols = [
         'Symbol', 'StrikePrice', 'ltp', trigger_col_name, '%H', 'JSTT-C', '%C', 
-        'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'TradePoint Scrip'
+        'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'Trade Point Scrip'
     ]
+    
+   # ADD THIS LINE: Automatically remove any missing columns
+    display_cols = [col for col in display_cols if col in calls_df.columns]
     
     # Hide Trade Point Scrip and Lot Size by default. Keep Tradingview Scrip visible default.
     default_visible_cols = [
         'Symbol', 'StrikePrice', 'ltp', trigger_col_name, '%H', 'JSTT-C', '%C',
         'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip'
     ]
+    
+   # ADD THIS LINE: Automatically remove missing columns from defaults
+    default_visible_cols = [col for col in default_visible_cols if col in calls_df.columns]
     
     def color_change(val):
         if color_toggle == "Off":
