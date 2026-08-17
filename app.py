@@ -127,10 +127,10 @@ def save_ltp_cache(new_data):
     except:
         pass
 
-def load_JSTT-H_cache():
-    if os.path.exists(JSTT-H_CACHE_FILE):
+def load_JSTT_H_cache():
+    if os.path.exists(JSTT_H_CACHE_FILE):
         try:
-            with open(JSTT-H_CACHE_FILE, 'r') as f:
+            with open(JSTT_H_CACHE_FILE, 'r') as f:
                 data = json.load(f)
                 today_str = get_ist_now().strftime('%Y-%m-%d')
                 if data.get('date') == today_str:
@@ -139,16 +139,16 @@ def load_JSTT-H_cache():
             pass
     return {}
 
-def save_JSTT-H_cache(new_highs):
+def save_JSTT_H_cache(new_highs):
     try:
-        cache = load_JSTT-H_cache()
+        cache = load_JSTT_H_cache()
         cache.update(new_highs)
         today_str = get_ist_now().strftime('%Y-%m-%d')
         save_data = {
             'date': today_str,
             'highs': cache
         }
-        with open(JSTT-H_CACHE_FILE, 'w') as f:
+        with open(JSTT_H_CACHE_FILE, 'w') as f:
             json.dump(save_data, f)
     except:
         pass
@@ -527,7 +527,7 @@ def display_option_chain(df, access_token):
         df['Trigger'] = df['HighPrice']
     else:
         df['Trigger'] = 0.0
-        high_cache = load_JSTT-H_cache()
+        high_cache = load_JSTT_H_cache()
         if high_cache:
             df['Trigger'] = df['instrument_key'].map(high_cache).fillna(df['Trigger'])
             
@@ -666,12 +666,12 @@ if logo_base64:
     <div style="display: flex; align-items: center; gap: 16px; margin-top: 0.5rem; margin-bottom: 1.2rem; flex-wrap: wrap;">
         <img src="data:image/png;base64,{logo_base64}" style="height: 52px; max-height: 52px; width: auto; object-fit: contain; vertical-align: middle; flex-shrink: 0;" />
         <h1 style="margin: 0; padding: 0; color: #1e3a8a; font-size: 1.9rem; font-weight: 700; line-height: 1.3; display: inline-block;">
-            JSTT Option Scanner
+            Option Filter
         </h1>
     </div>
     """, unsafe_allow_html=True)
 else:
-    st.title("JSTT Option Scanner")
+    st.title("Option Filter")
 
 # Secret Handling (Client View Mode)
 is_client_view = "UPSTOX_ACCESS_TOKEN" in st.secrets
@@ -751,14 +751,14 @@ else:
         if uploaded_wh:
             csv_content, csv_name = process_uploaded_files(uploaded_wh)
             if csv_content:
-                with open(FILES['JSTT-H'], 'wb') as f:
+                with open(FILES['JSTT_H'], 'wb') as f:
                     f.write(csv_content)
                 if csv_name:
-                    save_meta('JSTT-H', csv_name)
+                    save_meta('JSTT_H', csv_name)
                 st.success(f"JSTT Trigger file updated from {csv_name}!")
 
-        if 'JSTT-H' in meta and os.path.exists(FILES['JSTT-H']):
-            st.caption(f"📅 Data Date: {meta['JSTT-H']}")
+        if 'JSTT_H' in meta and os.path.exists(FILES['JSTT_H']):
+            st.caption(f"📅 Data Date: {meta['JSTT_H']}")
 
         st.markdown("---")
         st.header("Auto Refresh")
@@ -771,14 +771,14 @@ if not nse_json_df.empty:
     run_every = refresh_interval if auto_refresh else None
     strike_file = FILES.get('Strike_Selection') if os.path.exists(FILES.get('Strike_Selection', '')) else None
 
-    if os.path.exists(FILES['JSTT-H']):
+    if os.path.exists(FILES['JSTT_H']):
         @st.fragment(run_every=run_every)
-        def show_JSTT-H():
-            df_wh, target_exp, all_exps = process_bhavcopy(FILES['JSTT-H'], nse_json_df, target_expiry_index=target_expiry_idx, strike_bhav_file=strike_file)
+        def show_JSTT_H():
+            df_wh, target_exp, all_exps = process_bhavcopy(FILES['JSTT_H'], nse_json_df, target_expiry_index=target_expiry_idx, strike_bhav_file=strike_file)
             if target_exp:
                 st.info(f"📅 Displaying Expiry: **{target_exp.strftime('%d-%b-%Y')}**")
             display_option_chain(df_wh, access_token)
-        show_JSTT-H()
+        show_JSTT_H()
     else:
         st.warning("JSTT Trigger Bhavcopy file not found. Please upload 'JSTT Trigger Bhavcopy' (CSV/ZIP) in the sidebar.")
 else:
