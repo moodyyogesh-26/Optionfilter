@@ -417,12 +417,11 @@ def process_bhavcopy(bhav_file, df_json, target_expiry_index=0, strike_bhav_file
         if result.empty and not atm_rows.empty:
             st.error("Data mismatch: Found options in Bhavcopy but couldn't find them in NSE.json. Please update NSE.json via the sidebar.")
 
-        # --- MODIFICATION START: Generate custom 'Scrip' dynamically without pulling FinInstrmNm ---
         final_df = result[[
             'TckrSymb', 'XpryDt', 'StrkPric', 'OptnTp', 
             'FuturePrice', 'ClsPric', 'instrument_key',
-            'HghPric', 'LwPric', 'LastPric' # FinInstrmNm is no longer needed here
-        ]].copy() # Added .copy() to avoid SettingWithCopyWarning later
+            'HghPric', 'LwPric', 'LastPric'
+        ]].copy()
 
         final_df = final_df.rename(columns={
             'TckrSymb': 'Symbol',
@@ -434,18 +433,23 @@ def process_bhavcopy(bhav_file, df_json, target_expiry_index=0, strike_bhav_file
             'LastPric': 'LastPrice'
         })
 
-        # Dynamically build the Scrip column (Symbol + YYMMDD + C/P + StrikePrice)
-        # 1. Format date to YYMMDD
-        formatted_date = final_df['ExpiryDate'].dt.strftime('%y%m%d')
-        
-        # 2. Extract first letter from OptionType ('CE' -> 'C', 'PE' -> 'P')
-        opt_type = final_df['OptionType'].str[0]
-        
-        # 3. Safely convert StrikePrice to string and remove ".0" at the end if present
+        # --- MODIFICATION START: Build Tradingview Scrip and Trade Point Scrip ---
+        # Shared strike formatting: remove trailing '.0' (e.g. 415.0 -> 415) while keeping decimals (e.g. 172.5)
         strike_str = final_df['StrikePrice'].astype(str).str.replace(r'\.0$', '', regex=True)
-        
-        # 4. Concatenate to form the final Scrip format with a comma at the end
-        final_df['Scrip'] = final_df['Symbol'] + formatted_date + opt_type + strike_str + ","
+
+        # 1. Tradingview Scrip: Symbol + YYMMDD + C/P + StrikePrice + ','
+        formatted_date_tv = final_df['ExpiryDate'].dt.strftime('%y%m%d')
+        opt_type_tv = final_df['OptionType'].str[0]
+        final_df['Tradingview Scrip'] = final_df['Symbol'] + formatted_date_tv + opt_type_tv + strike_str + ","
+
+        # 2. Trade Point Scrip: Symbol + DD-Mon-YYYY + CE/PE + StrikePrice (e.g. ADANIENSOL 25-Aug-2026 CE 1620)
+        formatted_date_tp = final_df['ExpiryDate'].dt.strftime('%d-%b-%Y')
+        final_df['Trade Point Scrip'] = (
+            final_df['Symbol'] + " " + 
+            formatted_date_tp + " " + 
+            final_df['OptionType'] + " " + 
+            strike_str
+        )
         # --- MODIFICATION END ---
 
         return final_df, target_expiry, available_expiries
@@ -545,7 +549,7 @@ def display_option_chain(df, access_token):
     trigger_col_name = 'JSTT Trigger'
     df = df.rename(columns={'Trigger': trigger_col_name})
 
-# Filter Controls
+    # Filter Controls
     col_f1, col_f2 = st.columns(2)
     with col_f1:
         filter_view = st.radio(
@@ -573,17 +577,22 @@ def display_option_chain(df, access_token):
         df = df[df['StrikePrice'] >= 1000]
     elif strike_filter == "Below 1000 (< 1000)":
         df = df[df['StrikePrice'] < 1000]
-    
+
     calls_df = df[df['OptionType'] == 'CE'].copy()
     puts_df = df[df['OptionType'] == 'PE'].copy()
 
     calls_df = calls_df.sort_values(by='change %', ascending=False)
     puts_df = puts_df.sort_values(by='change %', ascending=False)
 
-    display_cols = ['Symbol', 'StrikePrice', trigger_col_name, 'ltp', 'change %', 'Scrip']
+    # --- MODIFICATION START: Define display columns and default visible columns ---
+    display_cols = [
+        'Symbol', 'StrikePrice', trigger_col_name, 'ltp', 'change %', 
+        'Tradingview Scrip', 'Trade Point Scrip'
+    ]
     
-    # Exclude 'Scrip' from the list of columns visible by default
+    # Hide both scrip columns by default in UI
     default_visible_cols = ['Symbol', 'StrikePrice', trigger_col_name, 'ltp', 'change %']
+    # --- MODIFICATION END ---
     
     def color_change(val):
         if isinstance(val, (int, float)):
@@ -609,7 +618,7 @@ def display_option_chain(df, access_token):
             .format(format_dict)
             .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
             hide_index=True,
-            column_order=default_visible_cols, # Hides 'Scrip' by default
+            column_order=default_visible_cols,
             use_container_width=True,
             height=1800
         )
@@ -622,7 +631,7 @@ def display_option_chain(df, access_token):
             .format(format_dict)
             .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
             hide_index=True,
-            column_order=default_visible_cols, # Hides 'Scrip' by default
+            column_order=default_visible_cols,
             use_container_width=True,
             height=1800
         )
