@@ -69,10 +69,10 @@ if not os.path.exists(DATA_DIR):
 TOKEN_FILE = os.path.join(DATA_DIR, 'token.json')
 META_FILE = os.path.join(DATA_DIR, 'meta.json')
 LTP_CACHE_FILE = os.path.join(DATA_DIR, 'ltp_cache.json')
-JSTT_Trigger_CACHE_FILE = os.path.join(DATA_DIR, 'JSTT_Trigger_cache.json')
+JSTT-H_CACHE_FILE = os.path.join(DATA_DIR, 'JSTT-H_cache.json')
 
 FILES = {
-    'JSTT_Trigger': os.path.join(DATA_DIR, 'JSTT_Trigger.csv'),
+    'JSTT-H': os.path.join(DATA_DIR, 'JSTT-H.csv'),
     'Strike_Selection': os.path.join(DATA_DIR, 'strike_selection.csv')
 }
 
@@ -127,10 +127,10 @@ def save_ltp_cache(new_data):
     except:
         pass
 
-def load_JSTT_Trigger_cache():
-    if os.path.exists(JSTT_Trigger_CACHE_FILE):
+def load_JSTT-H_cache():
+    if os.path.exists(JSTT-H_CACHE_FILE):
         try:
-            with open(JSTT_Trigger_CACHE_FILE, 'r') as f:
+            with open(JSTT-H_CACHE_FILE, 'r') as f:
                 data = json.load(f)
                 today_str = get_ist_now().strftime('%Y-%m-%d')
                 if data.get('date') == today_str:
@@ -139,16 +139,16 @@ def load_JSTT_Trigger_cache():
             pass
     return {}
 
-def save_JSTT_Trigger_cache(new_highs):
+def save_JSTT-H_cache(new_highs):
     try:
-        cache = load_JSTT_Trigger_cache()
+        cache = load_JSTT-H_cache()
         cache.update(new_highs)
         today_str = get_ist_now().strftime('%Y-%m-%d')
         save_data = {
             'date': today_str,
             'highs': cache
         }
-        with open(JSTT_Trigger_CACHE_FILE, 'w') as f:
+        with open(JSTT-H_CACHE_FILE, 'w') as f:
             json.dump(save_data, f)
     except:
         pass
@@ -527,7 +527,7 @@ def display_option_chain(df, access_token):
         df['Trigger'] = df['HighPrice']
     else:
         df['Trigger'] = 0.0
-        high_cache = load_JSTT_Trigger_cache()
+        high_cache = load_JSTT-H_cache()
         if high_cache:
             df['Trigger'] = df['instrument_key'].map(high_cache).fillna(df['Trigger'])
             
@@ -751,14 +751,14 @@ else:
         if uploaded_wh:
             csv_content, csv_name = process_uploaded_files(uploaded_wh)
             if csv_content:
-                with open(FILES['JSTT_Trigger'], 'wb') as f:
+                with open(FILES['JSTT-H'], 'wb') as f:
                     f.write(csv_content)
                 if csv_name:
-                    save_meta('JSTT_Trigger', csv_name)
+                    save_meta('JSTT-H', csv_name)
                 st.success(f"JSTT Trigger file updated from {csv_name}!")
 
-        if 'JSTT_Trigger' in meta and os.path.exists(FILES['JSTT_Trigger']):
-            st.caption(f"📅 Data Date: {meta['JSTT_Trigger']}")
+        if 'JSTT-H' in meta and os.path.exists(FILES['JSTT-H']):
+            st.caption(f"📅 Data Date: {meta['JSTT-H']}")
 
         st.markdown("---")
         st.header("Auto Refresh")
@@ -771,14 +771,14 @@ if not nse_json_df.empty:
     run_every = refresh_interval if auto_refresh else None
     strike_file = FILES.get('Strike_Selection') if os.path.exists(FILES.get('Strike_Selection', '')) else None
 
-    if os.path.exists(FILES['JSTT_Trigger']):
+    if os.path.exists(FILES['JSTT-H']):
         @st.fragment(run_every=run_every)
-        def show_JSTT_Trigger():
-            df_wh, target_exp, all_exps = process_bhavcopy(FILES['JSTT_Trigger'], nse_json_df, target_expiry_index=target_expiry_idx, strike_bhav_file=strike_file)
+        def show_JSTT-H():
+            df_wh, target_exp, all_exps = process_bhavcopy(FILES['JSTT-H'], nse_json_df, target_expiry_index=target_expiry_idx, strike_bhav_file=strike_file)
             if target_exp:
                 st.info(f"📅 Displaying Expiry: **{target_exp.strftime('%d-%b-%Y')}**")
             display_option_chain(df_wh, access_token)
-        show_JSTT_Trigger()
+        show_JSTT-H()
     else:
         st.warning("JSTT Trigger Bhavcopy file not found. Please upload 'JSTT Trigger Bhavcopy' (CSV/ZIP) in the sidebar.")
 else:
