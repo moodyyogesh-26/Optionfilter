@@ -93,6 +93,32 @@ def get_base64_image(image_path):
                 pass
     return ""
 
+def render_header(target_exp=None):
+    """Renders the top header with logo, title, and right-aligned expiry badge."""
+    logo_base64 = get_base64_image('jstt_logo.png')
+    logo_html = f'<img src="data:image/png;base64,{logo_base64}" style="height: 52px; max-height: 52px; width: auto; object-fit: contain; vertical-align: middle; flex-shrink: 0;" />' if logo_base64 else ''
+    
+    expiry_html = ''
+    if target_exp:
+        exp_str = target_exp.strftime('%d-%b-%Y') if hasattr(target_exp, 'strftime') else str(target_exp)
+        expiry_html = f'''
+        <div style="background-color: #e0f2fe; color: #0369a1; padding: 6px 14px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; border: 1px solid #bae6fd; display: flex; align-items: center; gap: 6px; white-space: nowrap; margin-left: auto;">
+            <span>📅 Expiry:</span> <strong style="color: #0284c7;">{exp_str}</strong>
+        </div>
+        '''
+        
+    st.markdown(f"""
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.5rem; margin-bottom: 1.2rem; flex-wrap: wrap; gap: 16px;">
+        <div style="display: flex; align-items: center; gap: 16px;">
+            {logo_html}
+            <h1 style="margin: 0; padding: 0; color: #1e3a8a; font-size: 1.9rem; font-weight: 700; line-height: 1.3; display: inline-block;">
+                Option Filter
+            </h1>
+        </div>
+        {expiry_html}
+    </div>
+    """, unsafe_allow_html=True)
+
 def load_meta():
     if os.path.exists(META_FILE):
         try:
@@ -534,11 +560,9 @@ def display_option_chain(df, access_token):
                 sym_col = next((c for c in ldf.columns if c in ['SYMBOL', 'UNDERLYING', 'TCKRSYMB']), None)
                 lot_col = next((c for c in ldf.columns if 'LOT' in c or 'SIZE' in c), None)
                 if sym_col and lot_col:
-                    # Sort by expiry/month if available to guarantee latest (nearest) month is at the top
                     month_col = next((c for c in ldf.columns if 'MONTH' in c or 'EXPIRY' in c), None)
                     if month_col:
                         ldf = ldf.sort_values(month_col)
-                    # Drop duplicates keeping the first occurrence (latest month)
                     ldf = ldf.drop_duplicates(subset=[sym_col], keep='first')
                     return dict(zip(ldf[sym_col], ldf[lot_col]))
             except Exception:
@@ -546,7 +570,6 @@ def display_option_chain(df, access_token):
         return {}
 
     lot_size_map = get_lot_sizes()
-    # Map the Symbol to the Lot Size, defaulting to 0 if not found
     df['Lot Size'] = df['Symbol'].map(lot_size_map).fillna(0).astype(int)
 
     # JSTT: Priority given to 5-day MAX high calculated from uploaded Bhavcopies
@@ -583,7 +606,6 @@ def display_option_chain(df, access_token):
             pass
         return 0.0
 
-    # Calculate %C for Last week close difference
     def calculate_c_percent(row):
         try:
             close_val = float(row.get('JSTT-C', 0.0))
@@ -594,7 +616,6 @@ def display_option_chain(df, access_token):
             pass
         return 0.0
 
-    # Calculate %L for Last week low difference
     def calculate_l_percent(row):
         try:
             low_val = float(row.get('JSTT-L', 0.0))
@@ -617,38 +638,50 @@ def display_option_chain(df, access_token):
     trigger_col_name = 'JSTT-H'
     df = df.rename(columns={'Trigger': trigger_col_name})
 
-    # --- NEW ORGANIZED DASHBOARD CONTROLS ---
+    # --- ORGANIZED DASHBOARD CONTROLS WITH SEARCH ---
     st.markdown("---")
     
-    # Reduced main columns to visually condense layout
-    col_f1, col_f2, col_f3, col_f4, col_f5 = st.columns([2.8, 1, 1, 1.4, 0.8])
+    # 6 columns to include Search
+    col_f1, col_f2, col_f3, col_f4, col_f5, col_f6 = st.columns([2.4, 1.5, 0.9, 0.9, 1.3, 0.8])
     
     with col_f1:
-        # Merged the Metric, Min %, and Max % into nested columns to integrate them tightly
         sc1, sc2, sc3 = st.columns(3)
         filter_metric = sc1.selectbox("Filter View:", options=["%H", "%C", "%L"], index=1, key="filter_metric_select")
         min_pct_input = sc2.text_input("Min % (>=):", value="", placeholder="e.g. 80")
         max_pct_input = sc3.text_input("Max % (<=):", value="", placeholder="e.g. 120")
         
     with col_f2:
-        min_strike_input = st.text_input("Min Price:", value="1000", placeholder=">= StrikePrice")
+        search_query = st.text_input("🔍 Search:", value="", placeholder="Symbol / Strike / Scrip", key="search_query_input")
         
     with col_f3:
-        max_lot_input = st.text_input("Max Lot:", value="", placeholder="< Max Lot")
+        min_strike_input = st.text_input("Min Price:", value="1000", placeholder=">= StrikePrice")
         
     with col_f4:
-        # Shortened the layout text to make it fit easily
+        max_lot_input = st.text_input("Max Lot:", value="", placeholder="< Max Lot")
+        
+    with col_f5:
         layout_view = st.selectbox(
             "Layout:",
             options=["↔️ Split", "📈 CE Max", "📉 PE Max"],
             key="table_layout_radio"
         )
         
-    with col_f5:
+    with col_f6:
         color_toggle = st.radio("Color:", options=["On", "Off"], horizontal=True, key="color_toggle_radio")
         
     st.markdown("---")
     # ----------------------------------------
+
+    # Apply Search Filter (Symbol, StrikePrice, Tradingview Scrip, Trade Point Scrip)
+    if search_query.strip():
+        q = search_query.strip().lower()
+        searchable_cols = ['Symbol', 'StrikePrice', 'Tradingview Scrip', 'Trade Point Scrip']
+        active_search_cols = [c for c in searchable_cols if c in df.columns]
+        if active_search_cols:
+            search_mask = df[active_search_cols].astype(str).apply(
+                lambda col: col.str.lower().str.contains(q, regex=False)
+            ).any(axis=1)
+            df = df[search_mask]
 
     # Apply % Range Filter
     if min_pct_input.strip():
@@ -671,7 +704,7 @@ def display_option_chain(df, access_token):
             min_strike_val = float(min_strike_input.strip())
             df = df[df['StrikePrice'] >= min_strike_val]
         except ValueError:
-            pass # Ignore if user types text instead of a number
+            pass
 
     # Apply Lot Size Filter
     if max_lot_input.strip():
@@ -679,7 +712,7 @@ def display_option_chain(df, access_token):
             max_lot_val = float(max_lot_input.strip())
             df = df[df['Lot Size'] < max_lot_val]
         except ValueError:
-            pass # Ignore if user types text instead of a number
+            pass
 
     calls_df = df[df['OptionType'] == 'CE'].copy()
     puts_df = df[df['OptionType'] == 'PE'].copy()
@@ -687,22 +720,18 @@ def display_option_chain(df, access_token):
     calls_df = calls_df.sort_values(by='%H', ascending=False)
     puts_df = puts_df.sort_values(by='%H', ascending=False)
 
-    # Define display columns including new JSTT-L, %L, Diff, and Lot Size
     display_cols = [
         'Symbol', 'StrikePrice', 'ltp', trigger_col_name, '%H', 'JSTT-C', '%C', 
         'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'Trade Point Scrip'
     ]
     
-   # ADD THIS LINE: Automatically remove any missing columns
     display_cols = [col for col in display_cols if col in calls_df.columns]
     
-    # Hide Trade Point Scrip and Lot Size by default. Keep Tradingview Scrip visible default.
     default_visible_cols = [
         'Symbol', 'StrikePrice', 'ltp', trigger_col_name, '%H', 'JSTT-C', '%C',
         'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'Trade Point Scrip'
     ]
     
-   # ADD THIS LINE: Automatically remove missing columns from defaults
     default_visible_cols = [col for col in default_visible_cols if col in calls_df.columns]
     
     def color_change(val):
@@ -729,7 +758,7 @@ def display_option_chain(df, access_token):
         'Lot Size': '{:d}'
     }
 
-    # Render layout based on the shortened select box selection
+    # Render layout
     if layout_view == "↔️ Split":
         col1, col2 = st.columns(2)
         with col1:
@@ -783,21 +812,6 @@ def display_option_chain(df, access_token):
             use_container_width=True,
             height=1800
         )
-
-# --- App Header & Configuration ---
-logo_base64 = get_base64_image('jstt_logo.png')
-
-if logo_base64:
-    st.markdown(f"""
-    <div style="display: flex; align-items: center; gap: 16px; margin-top: 0.5rem; margin-bottom: 1.2rem; flex-wrap: wrap;">
-        <img src="data:image/png;base64,{logo_base64}" style="height: 52px; max-height: 52px; width: auto; object-fit: contain; vertical-align: middle; flex-shrink: 0;" />
-        <h1 style="margin: 0; padding: 0; color: #1e3a8a; font-size: 1.9rem; font-weight: 700; line-height: 1.3; display: inline-block;">
-            Option Filter
-        </h1>
-    </div>
-    """, unsafe_allow_html=True)
-else:
-    st.title("Option Filter")
 
 # Secret Handling (Client View Mode)
 is_client_view = "UPSTOX_ACCESS_TOKEN" in st.secrets
@@ -886,9 +900,7 @@ else:
         if 'JSTT_H' in meta and os.path.exists(FILES['JSTT_H']):
             st.caption(f"📅 Data Date: {meta['JSTT_H']}")
             
-        # ----------------------------------------------------
-        # NEW: Lot Size Uploader (3. Lot Size File)
-        # ----------------------------------------------------
+        # Lot Size Uploader
         st.subheader("3. Lot Size File")
         uploaded_lot = st.file_uploader("Upload Dhan Lot Size File (CSV)", type=['csv'], key='lot_size_upload')
         if uploaded_lot is not None:
@@ -904,7 +916,6 @@ else:
 
         if 'Lot_Size' in meta and os.path.exists(FILES['Lot_Size']):
             st.caption(f"📅 Data File: {meta['Lot_Size']}")
-        # ----------------------------------------------------
 
         st.markdown("---")
         st.header("Auto Refresh")
@@ -921,11 +932,12 @@ if not nse_json_df.empty:
         @st.fragment(run_every=run_every)
         def show_JSTT_H():
             df_wh, target_exp, all_exps = process_bhavcopy(FILES['JSTT_H'], nse_json_df, target_expiry_index=target_expiry_idx, strike_bhav_file=strike_file)
-            if target_exp:
-                st.info(f"📅 Displaying Expiry: **{target_exp.strftime('%d-%b-%Y')}**")
+            render_header(target_exp)
             display_option_chain(df_wh, access_token)
         show_JSTT_H()
     else:
+        render_header()
         st.warning("JSTT Bhavcopy file not found. Please upload 'JSTT Bhavcopy' (CSV/ZIP) in the sidebar.")
 else:
+    render_header()
     st.error("Critical Error: NSE.json could not be loaded.")
