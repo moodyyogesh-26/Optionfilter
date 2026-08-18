@@ -30,9 +30,13 @@ st.set_page_config(
 # Custom CSS
 st.markdown("""
 <style>
+    hr {
+        margin-top: 0.5em !important; 
+        margin-bottom: 0.5em !important;
+    }
     .block-container {
-        padding-top: 3.5rem !important;
-        padding-bottom: 1rem !important;
+        padding-top: 3.0rem !important;
+        padding-bottom: 0.75rem !important;
     }
     header[data-testid="stHeader"] {
         background-color: transparent !important;
