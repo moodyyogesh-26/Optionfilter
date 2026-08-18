@@ -101,23 +101,20 @@ def render_header(target_exp=None):
     expiry_html = ''
     if target_exp:
         exp_str = target_exp.strftime('%d-%b-%Y') if hasattr(target_exp, 'strftime') else str(target_exp)
-        expiry_html = f'''
-        <div style="background-color: #e0f2fe; color: #0369a1; padding: 6px 14px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; border: 1px solid #bae6fd; display: flex; align-items: center; gap: 6px; white-space: nowrap; margin-left: auto;">
-            <span>📅 Expiry:</span> <strong style="color: #0284c7;">{exp_str}</strong>
-        </div>
-        '''
+        # Avoid leading spaces/indentation here so Streamlit doesn't parse it as a markdown code block
+        expiry_html = f'<div style="background-color: #e0f2fe; color: #0369a1; padding: 6px 14px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; border: 1px solid #bae6fd; display: flex; align-items: center; gap: 6px; white-space: nowrap; margin-left: auto;"><span>📅 Expiry:</span> <strong style="color: #0284c7;">{exp_str}</strong></div>'
         
     st.markdown(f"""
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.5rem; margin-bottom: 1.2rem; flex-wrap: wrap; gap: 16px;">
-        <div style="display: flex; align-items: center; gap: 16px;">
-            {logo_html}
-            <h1 style="margin: 0; padding: 0; color: #1e3a8a; font-size: 1.9rem; font-weight: 700; line-height: 1.3; display: inline-block;">
-                Option Filter
-            </h1>
-        </div>
-        {expiry_html}
+<div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.5rem; margin-bottom: 1.2rem; flex-wrap: wrap; gap: 16px;">
+    <div style="display: flex; align-items: center; gap: 16px;">
+        {logo_html}
+        <h1 style="margin: 0; padding: 0; color: #1e3a8a; font-size: 1.9rem; font-weight: 700; line-height: 1.3; display: inline-block;">
+            Option Filter
+        </h1>
     </div>
-    """, unsafe_allow_html=True)
+    {expiry_html}
+</div>
+""", unsafe_allow_html=True)
 
 def load_meta():
     if os.path.exists(META_FILE):
@@ -638,12 +635,15 @@ def display_option_chain(df, access_token):
     trigger_col_name = 'JSTT-H'
     df = df.rename(columns={'Trigger': trigger_col_name})
 
-    # --- ORGANIZED DASHBOARD CONTROLS WITH SEARCH ---
+    # --- ORGANIZED DASHBOARD CONTROLS WITH SEARCH FIRST ---
     st.markdown("---")
     
-    # 6 columns to include Search
-    col_f1, col_f2, col_f3, col_f4, col_f5, col_f6 = st.columns([2.4, 1.5, 0.9, 0.9, 1.3, 0.8])
+    # Rearranged columns: Search comes first, then Filter View
+    col_f0, col_f1, col_f2, col_f3, col_f4, col_f5 = st.columns([1.5, 2.4, 0.9, 0.9, 1.3, 0.8])
     
+    with col_f0:
+        search_query = st.text_input("🔍 Search:", value="", placeholder="Symbol / Strike / Scrip", key="search_query_input")
+        
     with col_f1:
         sc1, sc2, sc3 = st.columns(3)
         filter_metric = sc1.selectbox("Filter View:", options=["%H", "%C", "%L"], index=1, key="filter_metric_select")
@@ -651,22 +651,19 @@ def display_option_chain(df, access_token):
         max_pct_input = sc3.text_input("Max % (<=):", value="", placeholder="e.g. 120")
         
     with col_f2:
-        search_query = st.text_input("🔍 Search:", value="", placeholder="Symbol / Strike / Scrip", key="search_query_input")
-        
-    with col_f3:
         min_strike_input = st.text_input("Min Price:", value="1000", placeholder=">= StrikePrice")
         
-    with col_f4:
+    with col_f3:
         max_lot_input = st.text_input("Max Lot:", value="", placeholder="< Max Lot")
         
-    with col_f5:
+    with col_f4:
         layout_view = st.selectbox(
             "Layout:",
             options=["↔️ Split", "📈 CE Max", "📉 PE Max"],
             key="table_layout_radio"
         )
         
-    with col_f6:
+    with col_f5:
         color_toggle = st.radio("Color:", options=["On", "Off"], horizontal=True, key="color_toggle_radio")
         
     st.markdown("---")
