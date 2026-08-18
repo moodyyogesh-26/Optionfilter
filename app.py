@@ -650,19 +650,19 @@ def display_option_chain(df, access_token):
         
     with col_f1:
         sc1, sc2, sc3 = st.columns(3)
-        filter_metric = sc1.selectbox("📊 Filter View:", options=["%H", "%C", "%L"], index=1, key="filter_metric_select")
+        filter_metric = sc1.selectbox("Filter View:", options=["%H", "%C", "%L"], index=1, key="filter_metric_select")
         min_pct_input = sc2.text_input("🔻 Min % (>=):", value="", placeholder="e.g. 80")
         max_pct_input = sc3.text_input("🔺 Max % (<=):", value="", placeholder="e.g. 120")
         
     with col_f2:
-        min_strike_input = st.text_input("💵 Min Price:", value="1000", placeholder=">= Price")
+        min_strike_input = st.text_input("Min Price:", value="1000", placeholder=">= Price")
         
     with col_f3:
         max_lot_input = st.text_input("📦 Max Lot:", value="", placeholder="< Lot Size")
         
     with col_f4:
         layout_view = st.selectbox(
-            "🖥️ Layout:",
+            "Layout:",
             options=["↔️ Split", "📈 CE Max", "📉 PE Max"],
             key="table_layout_radio"
         )
