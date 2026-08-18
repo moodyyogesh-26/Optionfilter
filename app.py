@@ -635,50 +635,47 @@ def display_option_chain(df, access_token):
     trigger_col_name = 'JSTT-H'
     df = df.rename(columns={'Trigger': trigger_col_name})
 
-    # --- ORGANIZED DASHBOARD CONTROLS WITH SEARCH FIRST ---
+    # --- ORGANIZED DASHBOARD CONTROLS WITH SEARCH FIRST & EMOJIS ---
     st.markdown("---")
     
     # Rearranged columns: Search comes first, then Filter View
     col_f0, col_f1, col_f2, col_f3, col_f4, col_f5 = st.columns([1.5, 2.4, 0.9, 0.9, 1.3, 0.8])
     
     with col_f0:
-        search_query = st.text_input("🔍 Search:", value="", placeholder="Symbol / Strike / Scrip", key="search_query_input")
+        search_query = st.text_input("🔍 Search:", value="", placeholder="Search anything...", key="search_query_input")
         
     with col_f1:
         sc1, sc2, sc3 = st.columns(3)
-        filter_metric = sc1.selectbox("Filter View:", options=["%H", "%C", "%L"], index=1, key="filter_metric_select")
-        min_pct_input = sc2.text_input("Min % (>=):", value="", placeholder="e.g. 80")
-        max_pct_input = sc3.text_input("Max % (<=):", value="", placeholder="e.g. 120")
+        filter_metric = sc1.selectbox("📊 Filter View:", options=["%H", "%C", "%L"], index=1, key="filter_metric_select")
+        min_pct_input = sc2.text_input("🔻 Min % (>=):", value="", placeholder="e.g. 80")
+        max_pct_input = sc3.text_input("🔺 Max % (<=):", value="", placeholder="e.g. 120")
         
     with col_f2:
-        min_strike_input = st.text_input("Min Price:", value="1000", placeholder=">= StrikePrice")
+        min_strike_input = st.text_input("💵 Min Price:", value="1000", placeholder=">= Price")
         
     with col_f3:
-        max_lot_input = st.text_input("Max Lot:", value="", placeholder="< Max Lot")
+        max_lot_input = st.text_input("📦 Max Lot:", value="", placeholder="< Lot Size")
         
     with col_f4:
         layout_view = st.selectbox(
-            "Layout:",
+            "🖥️ Layout:",
             options=["↔️ Split", "📈 CE Max", "📉 PE Max"],
             key="table_layout_radio"
         )
         
     with col_f5:
-        color_toggle = st.radio("Color:", options=["On", "Off"], horizontal=True, key="color_toggle_radio")
+        color_toggle = st.radio("🎨 Color:", options=["On", "Off"], horizontal=True, key="color_toggle_radio")
         
     st.markdown("---")
     # ----------------------------------------
 
-    # Apply Search Filter (Symbol, StrikePrice, Tradingview Scrip, Trade Point Scrip)
+    # Apply Global Search Filter across ALL columns
     if search_query.strip():
         q = search_query.strip().lower()
-        searchable_cols = ['Symbol', 'StrikePrice', 'Tradingview Scrip', 'Trade Point Scrip']
-        active_search_cols = [c for c in searchable_cols if c in df.columns]
-        if active_search_cols:
-            search_mask = df[active_search_cols].astype(str).apply(
-                lambda col: col.str.lower().str.contains(q, regex=False)
-            ).any(axis=1)
-            df = df[search_mask]
+        search_mask = df.astype(str).apply(
+            lambda col: col.str.lower().str.contains(q, regex=False)
+        ).any(axis=1)
+        df = df[search_mask]
 
     # Apply % Range Filter
     if min_pct_input.strip():
