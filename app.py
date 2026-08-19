@@ -643,7 +643,7 @@ def display_option_chain(df, access_token):
     st.markdown("---")
     
     # Rearranged columns: Search comes first, then Filter View
-    col_f0, col_f1, col_f2, col_f3, col_f4, col_f5 = st.columns([1.5, 2.4, 0.9, 0.9, 1.3, 0.8])
+    col_f0, col_f1, col_f2, col_f3, col_f4, col_f5 = st.columns([1.5, 2.4, 0.9, 1.1, 0.8, 0.9])
     
     with col_f0:
         search_query = st.text_input("🔍 Search:", value="", placeholder="Search anything...", key="search_query_input")
@@ -659,16 +659,16 @@ def display_option_chain(df, access_token):
         
     with col_f3:
         max_lot_input = st.text_input("📦 Max Lot:", value="", placeholder="< Lot Size")
-        
+    
     with col_f4:
-        layout_view = st.selectbox(
+        color_toggle = st.radio("🎨 Color:", options=["On", "Off"], key="color_toggle_radio")
+      
+    with col_f5:
+        layout_view = st.radio(
             "Layout:",
             options=["↔️ Split", "📈 CE Max", "📉 PE Max"],
             key="table_layout_radio"
         )
-        
-    with col_f5:
-        color_toggle = st.radio("🎨 Color:", options=["On", "Off"], horizontal=True, key="color_toggle_radio")
         
     st.markdown("---")
     # ----------------------------------------
