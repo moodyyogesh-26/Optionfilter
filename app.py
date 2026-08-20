@@ -917,8 +917,8 @@ else:
 
         st.markdown("---")
         st.header("Auto Refresh")
-        auto_refresh = st.checkbox("Enable Auto-Refresh", value=False)
-        refresh_interval = st.slider("Refresh Interval (seconds)", min_value=5, max_value=60, value=15)
+        auto_refresh = st.checkbox("Enable Auto-Refresh", value=True)
+        refresh_interval = st.slider("Refresh Interval (seconds)", min_value=5, max_value=60, value=30)
 
 nse_json_df = load_nse_json()
 
