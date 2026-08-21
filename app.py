@@ -651,14 +651,14 @@ def display_option_chain(df, access_token):
     with col_f1:
         sc1, sc2, sc3 = st.columns(3)
         filter_metric = sc1.selectbox("Filter View:", options=["%H", "%C", "%L"], index=1, key="filter_metric_select")
-        min_pct_input = sc2.text_input("🔺 Min % :", value="", placeholder="e.g. 90") #(>=)
-        max_pct_input = sc3.text_input("🔻 Max % :", value="", placeholder="e.g. 140") #(<=)
+        min_pct_input = sc2.text_input("🔺 Min % :", value="", placeholder="e.g. >=90")
+        max_pct_input = sc3.text_input("🔻 Max % :", value="", placeholder="e.g. <=140")
         
     with col_f2:
         min_strike_input = st.text_input("Min Price:", value="1000", placeholder=">= Price")
         
     with col_f3:
-        max_lot_input = st.text_input("📦 Max Lot:", value="", placeholder="< Lot Size")
+        max_lot_input = st.text_input("📦 Max Lot:", value="", placeholder="<= Lot Size")
     
     with col_f4:
         color_toggle = st.radio("🎨 Color:", options=["On", "Off"], key="color_toggle_radio")
@@ -708,7 +708,7 @@ def display_option_chain(df, access_token):
     if max_lot_input.strip():
         try:
             max_lot_val = float(max_lot_input.strip())
-            df = df[df['Lot Size'] < max_lot_val]
+            df = df[df['Lot Size'] <= max_lot_val]
         except ValueError:
             pass
 
