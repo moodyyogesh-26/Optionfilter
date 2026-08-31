@@ -688,14 +688,14 @@ def display_option_chain(df, access_token):
         max_pct_input = sc3.text_input("🔻 Max % :", value="", placeholder="e.g. <=140")
         
     with col_f2:
-        # Sort is strictly handled via this Dropdown independent of the filter above
-        sort_by = st.selectbox("↕️ Sort:", options=["%P", "%H", "%C", "%L", "Diff", "Lot Size", "Symbol", "Sr."], index=0, key="sort_by_select")
-
-    with col_f3:
         min_strike_input = st.text_input("Min Price:", value="1000", placeholder=">= Price")
         
-    with col_f4:
+    with col_f3:
         max_lot_input = st.text_input("📦 Max Lot:", value="", placeholder="<= Lot Size")
+
+    with col_f4:
+        # Sort is strictly handled via this Dropdown independent of the filter above
+        sort_by = st.selectbox("↕️ Sort:", options=["%P", "%H", "%C", "%L", "Diff", "Lot Size", "Symbol", "Sr."], index=0, key="sort_by_select")
     
     with col_f5:
         color_toggle = st.radio("🎨 Color:", options=["On", "Off"], key="color_toggle_radio")
