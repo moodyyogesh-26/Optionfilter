@@ -75,7 +75,7 @@ META_FILE = os.path.join(DATA_DIR, 'meta.json')
 LTP_CACHE_FILE = os.path.join(DATA_DIR, 'ltp_cache.json')
 JSTT_H_CACHE_FILE = os.path.join(DATA_DIR, 'JSTT_H_cache.json')
 
-# Updated FILES dictionary to include Previous Bhavcopy & Lot Size
+# Updated FILES dictionary
 FILES = {
     'JSTT_H': os.path.join(DATA_DIR, 'JSTT_H.csv'),
     'Strike_Selection': os.path.join(DATA_DIR, 'strike_selection.csv'),
@@ -106,7 +106,6 @@ def render_header(target_exp=None):
     expiry_html = ''
     if target_exp:
         exp_str = target_exp.strftime('%d-%b-%Y') if hasattr(target_exp, 'strftime') else str(target_exp)
-        # Avoid leading spaces/indentation here so Streamlit doesn't parse it as a markdown code block
         expiry_html = f'<div style="background-color: #e0f2fe; color: #0369a1; padding: 6px 14px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; border: 1px solid #bae6fd; display: flex; align-items: center; gap: 6px; white-space: nowrap; margin-left: auto;"><span>📅 Expiry:</span> <strong style="color: #0284c7;">{exp_str}</strong></div>'
         
     st.markdown(f"""
@@ -487,15 +486,15 @@ def process_bhavcopy(bhav_file, df_json, target_expiry_index=0, strike_bhav_file
         else:
             final_df['PrevClose'] = 0.0
 
-        # Shared strike formatting: remove trailing '.0' (e.g. 415.0 -> 415) while keeping decimals (e.g. 172.5)
+        # Shared strike formatting: remove trailing '.0'
         strike_str = final_df['StrikePrice'].astype(str).str.replace(r'\.0$', '', regex=True)
 
-        # 1. Tradingview Scrip: Symbol + YYMMDD + C/P + StrikePrice + ','
+        # 1. Tradingview Scrip
         formatted_date_tv = final_df['ExpiryDate'].dt.strftime('%y%m%d')
         opt_type_tv = final_df['OptionType'].str[0]
         final_df['Tradingview Scrip'] = final_df['Symbol'] + formatted_date_tv + opt_type_tv + strike_str + ","
 
-        # 2. Trade Point Scrip: Symbol + DD-Mon-YYYY + CE/PE + StrikePrice (e.g. ADANIENSOL 25-Aug-2026 CE 1620)
+        # 2. Trade Point Scrip
         formatted_date_tp = final_df['ExpiryDate'].dt.strftime('%d-%b-%Y')
         final_df['Trade Point Scrip'] = (
             final_df['Symbol'] + " " + 
@@ -598,7 +597,7 @@ def display_option_chain(df, access_token):
     lot_size_map = get_lot_sizes()
     df['Lot Size'] = df['Symbol'].map(lot_size_map).fillna(0).astype(int)
 
-    # JSTT: Priority given to 5-day MAX high calculated from uploaded Bhavcopies
+    # Trigger logic
     if 'HighPrice' in df.columns and (df['HighPrice'] > 0).any():
         df['Trigger'] = df['HighPrice']
     else:
@@ -607,19 +606,16 @@ def display_option_chain(df, access_token):
         if high_cache:
             df['Trigger'] = df['instrument_key'].map(high_cache).fillna(df['Trigger'])
             
-    # JSTT-C (Last week close) extraction
     if 'ClsPric' in df.columns:
         df['JSTT-C'] = df['ClsPric']
     else:
         df['JSTT-C'] = 0.0
 
-    # JSTT-L (Last week low) extraction
     if 'LowPrice' in df.columns:
         df['JSTT-L'] = df['LowPrice']
     else:
         df['JSTT-L'] = 0.0
 
-    # Calculate Diff (Close - Low)
     df['Diff'] = df['JSTT-C'] - df['JSTT-L']
 
     def calculate_numeric_change(row):
@@ -676,10 +672,9 @@ def display_option_chain(df, access_token):
     trigger_col_name = 'JSTT-H'
     df = df.rename(columns={'Trigger': trigger_col_name})
 
-    # --- ORGANIZED DASHBOARD CONTROLS WITH SEARCH FIRST & EMOJIS ---
+    # --- DASHBOARD CONTROLS ---
     st.markdown("---")
     
-    # Restructured layout to include 'Sort By' cleanly
     col_f0, col_f1, col_f2, col_f3, col_f4, col_f5, col_f6 = st.columns([1.2, 2.2, 0.9, 0.8, 0.8, 0.6, 0.9])
     
     with col_f0:
@@ -687,7 +682,8 @@ def display_option_chain(df, access_token):
         
     with col_f1:
         sc1, sc2, sc3 = st.columns(3)
-        filter_metric = sc1.selectbox("Filter View:", options=["%H", "%C", "%L", "%P"], index=1, key="filter_metric_select")
+        # Default index=3 selects "%P" as the default filter view
+        filter_metric = sc1.selectbox("Filter View:", options=["%H", "%C", "%L", "%P"], index=3, key="filter_metric_select")
         min_pct_input = sc2.text_input("🔺 Min % :", value="", placeholder="e.g. >=90")
         max_pct_input = sc3.text_input("🔻 Max % :", value="", placeholder="e.g. <=140")
         
@@ -713,7 +709,7 @@ def display_option_chain(df, access_token):
     st.markdown("---")
     # ----------------------------------------
 
-    # Apply Global Search Filter across ALL columns
+    # Apply Global Search Filter
     if search_query.strip():
         q = search_query.strip().lower()
         search_mask = df.astype(str).apply(
@@ -755,11 +751,9 @@ def display_option_chain(df, access_token):
     calls_df = df[df['OptionType'] == 'CE'].copy()
     puts_df = df[df['OptionType'] == 'PE'].copy()
 
-    # Apply Sorting based on Dropdown
-    # Rules: 'Symbol' is ascending (A-Z). Everything else (percentages, sizes) generally makes more sense descending (highest first).
-    # If user selected 'Sr.', we simply sort by Symbol alphabetically as a stable base to generate the serial numbers.
+    # Apply Sorting
     sort_column = sort_by
-    sort_ascending = True 
+    sort_ascending = False 
 
     if sort_by == 'Sr.':
         sort_column = 'Symbol'
@@ -772,26 +766,16 @@ def display_option_chain(df, access_token):
     if sort_column in puts_df.columns:
         puts_df = puts_df.sort_values(by=sort_column, ascending=sort_ascending)
 
-    # Overwrite the DataFrame index AFTER filtering and sorting to guarantee sequential numbering from 1 to N
-    calls_df.index = range(1, len(calls_df) + 1)
-    calls_df.index.name = 'Sr.'
-    
-    puts_df.index = range(1, len(puts_df) + 1)
-    puts_df.index.name = 'Sr.'
+    # Insert Sr. as a true column AFTER sorting, guaranteeing 1 to N order.
+    calls_df.insert(0, 'Sr.', range(1, len(calls_df) + 1))
+    puts_df.insert(0, 'Sr.', range(1, len(puts_df) + 1))
 
     display_cols = [
-        'Symbol', 'StrikePrice', 'ltp', '%P', trigger_col_name, '%H', 'JSTT-C', '%C', 
+        'Sr.', 'Symbol', 'StrikePrice', 'ltp', '%P', trigger_col_name, '%H', 'JSTT-C', '%C', 
         'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'Trade Point Scrip'
     ]
     
     display_cols = [col for col in display_cols if col in calls_df.columns]
-    
-    default_visible_cols = [
-        'Symbol', 'StrikePrice', 'ltp', '%P', trigger_col_name, '%H', 'JSTT-C', '%C',
-        'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'Trade Point Scrip'
-    ]
-    
-    default_visible_cols = [col for col in default_visible_cols if col in calls_df.columns]
     
     def color_change(val):
         if color_toggle == "Off":
@@ -818,7 +802,7 @@ def display_option_chain(df, access_token):
         'Lot Size': '{:d}'
     }
 
-    # Render layout - No hide_index parameter so 'Sr.' appears automatically
+    # Render layout - Now strictly hiding index so only the real "Sr." column shows.
     if layout_view == "↔️ Split":
         col1, col2 = st.columns(2)
         with col1:
@@ -828,7 +812,7 @@ def display_option_chain(df, access_token):
                 .map(color_change, subset=['%H', '%C', '%L'])
                 .format(format_dict)
                 .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
-                column_order=default_visible_cols,
+                hide_index=True,
                 use_container_width=True,
                 height=1800
             )
@@ -840,7 +824,7 @@ def display_option_chain(df, access_token):
                 .map(color_change, subset=['%H', '%C', '%L'])
                 .format(format_dict)
                 .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
-                column_order=default_visible_cols,
+                hide_index=True,
                 use_container_width=True,
                 height=1800
             )
@@ -852,7 +836,7 @@ def display_option_chain(df, access_token):
             .map(color_change, subset=['%H', '%C', '%L'])
             .format(format_dict)
             .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
-            column_order=default_visible_cols,
+            hide_index=True,
             use_container_width=True,
             height=1800
         )
@@ -864,7 +848,7 @@ def display_option_chain(df, access_token):
             .map(color_change, subset=['%H', '%C', '%L'])
             .format(format_dict)
             .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
-            column_order=default_visible_cols,
+            hide_index=True,
             use_container_width=True,
             height=1800
         )
