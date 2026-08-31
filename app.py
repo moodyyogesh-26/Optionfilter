@@ -761,6 +761,8 @@ def display_option_chain(df, access_token):
         sort_ascending = True
     elif sort_by == 'Symbol':
         sort_ascending = True
+    elif sort_by == 'Diff':
+        sort_ascending = True
 
     if sort_column in calls_df.columns:
         calls_df = calls_df.sort_values(by=sort_column, ascending=sort_ascending)
