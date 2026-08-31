@@ -679,8 +679,8 @@ def display_option_chain(df, access_token):
     # --- ORGANIZED DASHBOARD CONTROLS WITH SEARCH FIRST & EMOJIS ---
     st.markdown("---")
     
-    # Rearranged columns: Search comes first, then Filter View
-    col_f0, col_f1, col_f2, col_f3, col_f4, col_f5 = st.columns([1.5, 2.4, 0.9, 1.1, 0.8, 0.9])
+    # Restructured layout to include 'Sort By' cleanly
+    col_f0, col_f1, col_f2, col_f3, col_f4, col_f5, col_f6 = st.columns([1.2, 2.2, 0.9, 0.8, 0.8, 0.6, 0.9])
     
     with col_f0:
         search_query = st.text_input("🔍 Search:", value="", placeholder="Search anything...", key="search_query_input")
@@ -692,15 +692,18 @@ def display_option_chain(df, access_token):
         max_pct_input = sc3.text_input("🔻 Max % :", value="", placeholder="e.g. <=140")
         
     with col_f2:
+        sort_by = st.selectbox("↕️ Sort:", options=["%P", "%H", "%C", "%L", "Diff", "Lot Size", "Symbol", "Sr."], index=0, key="sort_by_select")
+
+    with col_f3:
         min_strike_input = st.text_input("Min Price:", value="1000", placeholder=">= Price")
         
-    with col_f3:
+    with col_f4:
         max_lot_input = st.text_input("📦 Max Lot:", value="", placeholder="<= Lot Size")
     
-    with col_f4:
+    with col_f5:
         color_toggle = st.radio("🎨 Color:", options=["On", "Off"], key="color_toggle_radio")
        
-    with col_f5:
+    with col_f6:
         layout_view = st.radio(
             "Layout:",
             options=["↔️ Split", "📈 CE Max", "📉 PE Max"],
@@ -752,10 +755,24 @@ def display_option_chain(df, access_token):
     calls_df = df[df['OptionType'] == 'CE'].copy()
     puts_df = df[df['OptionType'] == 'PE'].copy()
 
-    calls_df = calls_df.sort_values(by='%H', ascending=False)
-    puts_df = puts_df.sort_values(by='%H', ascending=False)
+    # Apply Sorting based on Dropdown
+    # Rules: 'Symbol' is ascending (A-Z). Everything else (percentages, sizes) generally makes more sense descending (highest first).
+    # If user selected 'Sr.', we simply sort by Symbol alphabetically as a stable base to generate the serial numbers.
+    sort_column = sort_by
+    sort_ascending = False 
 
-    # Overwrite the DataFrame index to be our dynamic serial numbers
+    if sort_by == 'Sr.':
+        sort_column = 'Symbol'
+        sort_ascending = True
+    elif sort_by == 'Symbol':
+        sort_ascending = True
+
+    if sort_column in calls_df.columns:
+        calls_df = calls_df.sort_values(by=sort_column, ascending=sort_ascending)
+    if sort_column in puts_df.columns:
+        puts_df = puts_df.sort_values(by=sort_column, ascending=sort_ascending)
+
+    # Overwrite the DataFrame index AFTER filtering and sorting to guarantee sequential numbering from 1 to N
     calls_df.index = range(1, len(calls_df) + 1)
     calls_df.index.name = 'Sr.'
     
@@ -801,7 +818,7 @@ def display_option_chain(df, access_token):
         'Lot Size': '{:d}'
     }
 
-    # Render layout - Removed 'hide_index=True' so 'Sr.' appears automatically
+    # Render layout - No hide_index parameter so 'Sr.' appears automatically
     if layout_view == "↔️ Split":
         col1, col2 = st.columns(2)
         with col1:
