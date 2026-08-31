@@ -755,19 +755,22 @@ def display_option_chain(df, access_token):
     calls_df = calls_df.sort_values(by='%H', ascending=False)
     puts_df = puts_df.sort_values(by='%H', ascending=False)
 
-    # Insert dynamic Sr. column to always map 1 to N exactly matching the filtered length
-    calls_df.insert(0, 'Sr.', range(1, len(calls_df) + 1))
-    puts_df.insert(0, 'Sr.', range(1, len(puts_df) + 1))
+    # Overwrite the DataFrame index to be our dynamic serial numbers
+    calls_df.index = range(1, len(calls_df) + 1)
+    calls_df.index.name = 'Sr.'
+    
+    puts_df.index = range(1, len(puts_df) + 1)
+    puts_df.index.name = 'Sr.'
 
     display_cols = [
-        'Sr.', 'Symbol', 'StrikePrice', 'ltp', '%P', trigger_col_name, '%H', 'JSTT-C', '%C', 
+        'Symbol', 'StrikePrice', 'ltp', '%P', trigger_col_name, '%H', 'JSTT-C', '%C', 
         'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'Trade Point Scrip'
     ]
     
     display_cols = [col for col in display_cols if col in calls_df.columns]
     
     default_visible_cols = [
-        'Sr.', 'Symbol', 'StrikePrice', 'ltp', '%P', trigger_col_name, '%H', 'JSTT-C', '%C',
+        'Symbol', 'StrikePrice', 'ltp', '%P', trigger_col_name, '%H', 'JSTT-C', '%C',
         'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'Trade Point Scrip'
     ]
     
@@ -798,7 +801,7 @@ def display_option_chain(df, access_token):
         'Lot Size': '{:d}'
     }
 
-    # Render layout
+    # Render layout - Removed 'hide_index=True' so 'Sr.' appears automatically
     if layout_view == "↔️ Split":
         col1, col2 = st.columns(2)
         with col1:
@@ -808,7 +811,6 @@ def display_option_chain(df, access_token):
                 .map(color_change, subset=['%H', '%C', '%L'])
                 .format(format_dict)
                 .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
-                hide_index=True,
                 column_order=default_visible_cols,
                 use_container_width=True,
                 height=1800
@@ -821,7 +823,6 @@ def display_option_chain(df, access_token):
                 .map(color_change, subset=['%H', '%C', '%L'])
                 .format(format_dict)
                 .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
-                hide_index=True,
                 column_order=default_visible_cols,
                 use_container_width=True,
                 height=1800
@@ -834,7 +835,6 @@ def display_option_chain(df, access_token):
             .map(color_change, subset=['%H', '%C', '%L'])
             .format(format_dict)
             .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
-            hide_index=True,
             column_order=default_visible_cols,
             use_container_width=True,
             height=1800
@@ -847,7 +847,6 @@ def display_option_chain(df, access_token):
             .map(color_change, subset=['%H', '%C', '%L'])
             .format(format_dict)
             .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
-            hide_index=True,
             column_order=default_visible_cols,
             use_container_width=True,
             height=1800
