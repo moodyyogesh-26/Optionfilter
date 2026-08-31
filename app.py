@@ -682,7 +682,7 @@ def display_option_chain(df, access_token):
         
     with col_f1:
         sc1, sc2, sc3 = st.columns(3)
-        # Filter View now safely defaults to %C (index 1) and is STRICTLY for the range filters.
+        # Filter View defaults to %C (index 1) and is STRICTLY for the range filters.
         filter_metric = sc1.selectbox("Filter View:", options=["%H", "%C", "%L", "%P"], index=1, key="filter_metric_select")
         min_pct_input = sc2.text_input("🔺 Min % :", value="", placeholder="e.g. >=90")
         max_pct_input = sc3.text_input("🔻 Max % :", value="", placeholder="e.g. <=140")
@@ -928,18 +928,24 @@ else:
 
         # Previous Day Bhavcopy Uploader
         st.subheader("2. Previous Day Bhavcopy")
-        uploaded_prev = st.file_uploader("Upload Previous Day Bhavcopy (CSV/ZIP)", type=['csv', 'zip'], key='prev_sel')
-        if uploaded_prev is not None:
-            csv_content, csv_name = process_uploaded_files(uploaded_prev)
-            if csv_content:
-                with open(FILES['Prev_Bhavcopy'], 'wb') as f:
-                    f.write(csv_content)
-                if csv_name:
-                    save_meta('Prev_Bhavcopy', csv_name)
-                st.success(f"Previous Bhavcopy file updated from {csv_name}!")
+        # Checkbox defaults to False (Off). Toggles custom file vs ATM file handling.
+        use_custom_prev_bhav = st.checkbox("Upload custom Previous Day Bhavcopy", value=False, key="use_prev_bhav_check")
+        
+        if use_custom_prev_bhav:
+            uploaded_prev = st.file_uploader("Upload Previous Day Bhavcopy (CSV/ZIP)", type=['csv', 'zip'], key='prev_sel')
+            if uploaded_prev is not None:
+                csv_content, csv_name = process_uploaded_files(uploaded_prev)
+                if csv_content:
+                    with open(FILES['Prev_Bhavcopy'], 'wb') as f:
+                        f.write(csv_content)
+                    if csv_name:
+                        save_meta('Prev_Bhavcopy', csv_name)
+                    st.success(f"Previous Bhavcopy file updated from {csv_name}!")
 
-        if 'Prev_Bhavcopy' in meta and os.path.exists(FILES['Prev_Bhavcopy']):
-            st.caption(f"📅 Data Date: {meta['Prev_Bhavcopy']}")
+            if 'Prev_Bhavcopy' in meta and os.path.exists(FILES['Prev_Bhavcopy']):
+                st.caption(f"📅 Data Date: {meta['Prev_Bhavcopy']}")
+        else:
+            st.info("Using Strike Selection (ATM) as Previous Day Bhavcopy.")
 
         # JSTT Uploader
         st.subheader("3. JSTT Bhavcopy")
@@ -983,6 +989,13 @@ nse_json_df = load_nse_json()
 if not nse_json_df.empty:
     run_every = refresh_interval if auto_refresh else None
     strike_file = FILES.get('Strike_Selection') if os.path.exists(FILES.get('Strike_Selection', '')) else None
+    
+    # Resolve the correct previous day bhavcopy source based on the user's toggle setting
+    use_custom_prev = st.session_state.get("use_prev_bhav_check", False)
+    if use_custom_prev:
+        prev_file_path = FILES.get('Prev_Bhavcopy') if os.path.exists(FILES.get('Prev_Bhavcopy', '')) else None
+    else:
+        prev_file_path = strike_file
 
     if os.path.exists(FILES['JSTT_H']):
         @st.fragment(run_every=run_every)
@@ -992,7 +1005,7 @@ if not nse_json_df.empty:
                 nse_json_df, 
                 target_expiry_index=target_expiry_idx, 
                 strike_bhav_file=strike_file,
-                prev_bhav_file=FILES.get('Prev_Bhavcopy') if os.path.exists(FILES.get('Prev_Bhavcopy', '')) else None
+                prev_bhav_file=prev_file_path
             )
             render_header(target_exp)
             display_option_chain(df_wh, access_token)
