@@ -75,10 +75,11 @@ META_FILE = os.path.join(DATA_DIR, 'meta.json')
 LTP_CACHE_FILE = os.path.join(DATA_DIR, 'ltp_cache.json')
 JSTT_H_CACHE_FILE = os.path.join(DATA_DIR, 'JSTT_H_cache.json')
 
-# Updated FILES dictionary to include Lot Size
+# Updated FILES dictionary to include Previous Bhavcopy & Lot Size
 FILES = {
     'JSTT_H': os.path.join(DATA_DIR, 'JSTT_H.csv'),
     'Strike_Selection': os.path.join(DATA_DIR, 'strike_selection.csv'),
+    'Prev_Bhavcopy': os.path.join(DATA_DIR, 'prev_bhavcopy.csv'),
     'Lot_Size': os.path.join(DATA_DIR, 'lot_size.csv')
 }
 
@@ -345,7 +346,7 @@ def load_nse_json():
         st.error(f"NSE.json not found at {NSE_JSON_PATH}")
         return pd.DataFrame()
 
-def process_bhavcopy(bhav_file, df_json, target_expiry_index=0, strike_bhav_file=None):
+def process_bhavcopy(bhav_file, df_json, target_expiry_index=0, strike_bhav_file=None, prev_bhav_file=None):
     try:
         df_bhav = pd.read_csv(bhav_file)
         
@@ -461,6 +462,30 @@ def process_bhavcopy(bhav_file, df_json, target_expiry_index=0, strike_bhav_file
             'LwPric': 'LowPrice',
             'LastPric': 'LastPrice'
         })
+
+        # --- Merge Previous Day Bhavcopy for %P ---
+        if prev_bhav_file and os.path.exists(prev_bhav_file):
+            try:
+                df_prev = pd.read_csv(prev_bhav_file)
+                opts_prev = df_prev[df_prev['OptnTp'].isin(['CE', 'PE'])].copy()
+                opts_prev['XpryDt'] = pd.to_datetime(opts_prev['XpryDt']).dt.normalize()
+                opts_prev = opts_prev[['TckrSymb', 'XpryDt', 'StrkPric', 'OptnTp', 'ClsPric']]
+                opts_prev = opts_prev.rename(columns={'ClsPric': 'PrevClose'})
+                opts_prev = opts_prev.drop_duplicates(subset=['TckrSymb', 'XpryDt', 'StrkPric', 'OptnTp'])
+
+                final_df = pd.merge(
+                    final_df, 
+                    opts_prev,
+                    left_on=['Symbol', 'ExpiryDate', 'StrikePrice', 'OptionType'],
+                    right_on=['TckrSymb', 'XpryDt', 'StrkPric', 'OptnTp'],
+                    how='left'
+                )
+                final_df = final_df.drop(columns=['TckrSymb', 'XpryDt', 'StrkPric', 'OptnTp'])
+                final_df['PrevClose'] = final_df['PrevClose'].fillna(0.0)
+            except Exception as e:
+                final_df['PrevClose'] = 0.0
+        else:
+            final_df['PrevClose'] = 0.0
 
         # Shared strike formatting: remove trailing '.0' (e.g. 415.0 -> 415) while keeping decimals (e.g. 172.5)
         strike_str = final_df['StrikePrice'].astype(str).str.replace(r'\.0$', '', regex=True)
@@ -626,6 +651,16 @@ def display_option_chain(df, access_token):
         except Exception:
             pass
         return 0.0
+        
+    def calculate_p_percent(row):
+        try:
+            prev_close = float(row.get('PrevClose', 0.0))
+            ltp = float(row.get('ltp', 0.0))
+            if prev_close > 0 and ltp > 0:
+                return round(((ltp - prev_close) / prev_close) * 100, 2)
+        except Exception:
+            pass
+        return 0.0
 
     df['change_val'] = df.apply(calculate_numeric_change, axis=1)
     df['%H'] = df['change_val']
@@ -635,6 +670,8 @@ def display_option_chain(df, access_token):
     
     df['%L_val'] = df.apply(calculate_l_percent, axis=1)
     df['%L'] = df['%L_val']
+
+    df['%P'] = df.apply(calculate_p_percent, axis=1)
 
     trigger_col_name = 'JSTT-H'
     df = df.rename(columns={'Trigger': trigger_col_name})
@@ -650,7 +687,7 @@ def display_option_chain(df, access_token):
         
     with col_f1:
         sc1, sc2, sc3 = st.columns(3)
-        filter_metric = sc1.selectbox("Filter View:", options=["%H", "%C", "%L"], index=1, key="filter_metric_select")
+        filter_metric = sc1.selectbox("Filter View:", options=["%H", "%C", "%L", "%P"], index=1, key="filter_metric_select")
         min_pct_input = sc2.text_input("🔺 Min % :", value="", placeholder="e.g. >=90")
         max_pct_input = sc3.text_input("🔻 Max % :", value="", placeholder="e.g. <=140")
         
@@ -662,7 +699,7 @@ def display_option_chain(df, access_token):
     
     with col_f4:
         color_toggle = st.radio("🎨 Color:", options=["On", "Off"], key="color_toggle_radio")
-      
+       
     with col_f5:
         layout_view = st.radio(
             "Layout:",
@@ -718,15 +755,19 @@ def display_option_chain(df, access_token):
     calls_df = calls_df.sort_values(by='%H', ascending=False)
     puts_df = puts_df.sort_values(by='%H', ascending=False)
 
+    # Insert dynamic Sr. column to always map 1 to N exactly matching the filtered length
+    calls_df.insert(0, 'Sr.', range(1, len(calls_df) + 1))
+    puts_df.insert(0, 'Sr.', range(1, len(puts_df) + 1))
+
     display_cols = [
-        'Symbol', 'StrikePrice', 'ltp', trigger_col_name, '%H', 'JSTT-C', '%C', 
+        'Sr.', 'Symbol', 'StrikePrice', 'ltp', '%P', trigger_col_name, '%H', 'JSTT-C', '%C', 
         'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'Trade Point Scrip'
     ]
     
     display_cols = [col for col in display_cols if col in calls_df.columns]
     
     default_visible_cols = [
-        'Symbol', 'StrikePrice', 'ltp', trigger_col_name, '%H', 'JSTT-C', '%C',
+        'Sr.', 'Symbol', 'StrikePrice', 'ltp', '%P', trigger_col_name, '%H', 'JSTT-C', '%C',
         'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'Trade Point Scrip'
     ]
     
@@ -747,6 +788,7 @@ def display_option_chain(df, access_token):
         '%H': '{:.2f}%',
         '%C': '{:.2f}%',
         '%L': '{:.2f}%',
+        '%P': '{:.2f}%',
         trigger_col_name: '{:.2f}',
         'JSTT-C': '{:.2f}',
         'JSTT-L': '{:.2f}',
@@ -883,8 +925,23 @@ else:
         if 'Strike_Selection' in meta and os.path.exists(FILES['Strike_Selection']):
             st.caption(f"📅 Data Date: {meta['Strike_Selection']}")
 
+        # Previous Day Bhavcopy Uploader
+        st.subheader("2. Previous Day Bhavcopy")
+        uploaded_prev = st.file_uploader("Upload Previous Day Bhavcopy (CSV/ZIP)", type=['csv', 'zip'], key='prev_sel')
+        if uploaded_prev is not None:
+            csv_content, csv_name = process_uploaded_files(uploaded_prev)
+            if csv_content:
+                with open(FILES['Prev_Bhavcopy'], 'wb') as f:
+                    f.write(csv_content)
+                if csv_name:
+                    save_meta('Prev_Bhavcopy', csv_name)
+                st.success(f"Previous Bhavcopy file updated from {csv_name}!")
+
+        if 'Prev_Bhavcopy' in meta and os.path.exists(FILES['Prev_Bhavcopy']):
+            st.caption(f"📅 Data Date: {meta['Prev_Bhavcopy']}")
+
         # JSTT Uploader
-        st.subheader("2. JSTT Bhavcopy")
+        st.subheader("3. JSTT Bhavcopy")
         uploaded_wh = st.file_uploader("Upload JSTT Bhavcopy (Multiple CSVs or ZIP)", type=['csv', 'zip'], accept_multiple_files=True, key='wh_sel')
         if uploaded_wh:
             csv_content, csv_name = process_uploaded_files(uploaded_wh)
@@ -899,7 +956,7 @@ else:
             st.caption(f"📅 Data Date: {meta['JSTT_H']}")
             
         # Lot Size Uploader
-        st.subheader("3. Lot Size File")
+        st.subheader("4. Lot Size File")
         uploaded_lot = st.file_uploader("Upload Dhan Lot Size File (CSV)", type=['csv'], key='lot_size_upload')
         if uploaded_lot is not None:
             try:
@@ -929,7 +986,13 @@ if not nse_json_df.empty:
     if os.path.exists(FILES['JSTT_H']):
         @st.fragment(run_every=run_every)
         def show_JSTT_H():
-            df_wh, target_exp, all_exps = process_bhavcopy(FILES['JSTT_H'], nse_json_df, target_expiry_index=target_expiry_idx, strike_bhav_file=strike_file)
+            df_wh, target_exp, all_exps = process_bhavcopy(
+                FILES['JSTT_H'], 
+                nse_json_df, 
+                target_expiry_index=target_expiry_idx, 
+                strike_bhav_file=strike_file,
+                prev_bhav_file=FILES.get('Prev_Bhavcopy') if os.path.exists(FILES.get('Prev_Bhavcopy', '')) else None
+            )
             render_header(target_exp)
             display_option_chain(df_wh, access_token)
         show_JSTT_H()
