@@ -759,7 +759,7 @@ def display_option_chain(df, access_token):
     # Rules: 'Symbol' is ascending (A-Z). Everything else (percentages, sizes) generally makes more sense descending (highest first).
     # If user selected 'Sr.', we simply sort by Symbol alphabetically as a stable base to generate the serial numbers.
     sort_column = sort_by
-    sort_ascending = False 
+    sort_ascending = True 
 
     if sort_by == 'Sr.':
         sort_column = 'Symbol'
