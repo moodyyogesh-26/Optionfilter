@@ -781,19 +781,32 @@ def display_option_chain(df, access_token):
     
     display_cols = [col for col in display_cols if col in calls_df.columns]
     
-    # Existing color logic for %H, %C, %L
-    def color_change(val):
+    # ---------------- DYNAMIC COLOR LOGIC ----------------
+    
+    # New green-only dynamic gradient shading exclusively for %H, %C, %L (starts at > 85%)
+    def color_hcl_percent(s):
         if color_toggle == "Off":
-            return ''
+            return [''] * len(s)
             
-        if isinstance(val, (int, float)):
-            if val >= 100:
-                return 'background-color: darkgreen; color: white'
-            elif val >= 90:
-                return 'background-color: lightgreen; color: black'
-        return ''
+        styles = []
+        s_numeric = pd.to_numeric(s, errors='coerce').fillna(0)
+        
+        # Determine the maximum value above 85 to scale the gradient
+        max_pos = s_numeric[s_numeric > 85].max() if not s_numeric[s_numeric > 85].empty else 86
+        range_pos = max_pos - 85 if max_pos > 85 else 1  # Guard against division by zero
+        
+        for val in s_numeric:
+            if val <= 85:
+                styles.append('')
+            else:
+                intensity = min((val - 85) / range_pos, 1.0)
+                alpha = 0.15 + (0.85 * intensity) 
+                text_color = 'white' if alpha > 0.55 else 'black'
+                styles.append(f'background-color: rgba(0, 128, 0, {alpha}); color: {text_color};')
+                
+        return styles
 
-    # New dynamic gradient shading exclusively for %P
+    # Existing red/green dynamic gradient shading exclusively for %P
     def color_p_percent(s):
         if color_toggle == "Off":
             return [''] * len(s)
@@ -801,7 +814,6 @@ def display_option_chain(df, access_token):
         styles = []
         s_numeric = pd.to_numeric(s, errors='coerce').fillna(0)
         
-        # Determine the maximum positive and minimum negative values to scale the intensity correctly
         max_pos = s_numeric[s_numeric > 0].max() if not s_numeric[s_numeric > 0].empty else 1
         min_neg = s_numeric[s_numeric < 0].min() if not s_numeric[s_numeric < 0].empty else -1
         
@@ -809,19 +821,19 @@ def display_option_chain(df, access_token):
             if val == 0:
                 styles.append('')
             elif val > 0:
-                # Normalize intensity between 0 and 1, adjust alpha for lighter/darker green
                 intensity = val / max_pos
                 alpha = 0.15 + (0.85 * intensity) 
                 text_color = 'white' if alpha > 0.55 else 'black'
                 styles.append(f'background-color: rgba(0, 128, 0, {alpha}); color: {text_color};')
             else:
-                # Normalize intensity between 0 and 1, adjust alpha for lighter/darker red
                 intensity = val / min_neg
                 alpha = 0.15 + (0.85 * intensity)
                 text_color = 'white' if alpha > 0.55 else 'black'
                 styles.append(f'background-color: rgba(255, 0, 0, {alpha}); color: {text_color};')
                 
         return styles
+        
+    # -----------------------------------------------------
 
     format_dict = {
         '%H': '{:.2f}%',
@@ -837,14 +849,14 @@ def display_option_chain(df, access_token):
         'Lot Size': '{:d}'
     }
 
-    # Render layout - Applying the new gradient styling just to the '%P' column
+    # Render layout - No hide_index parameter so the 'Sr.' index is displayed natively.
     if layout_view == "↔️ Split":
         col1, col2 = st.columns(2)
         with col1:
             st.subheader(f"Calls (CE) ({len(calls_df)})")
             st.dataframe(
                 calls_df[display_cols].style
-                .map(color_change, subset=['%H', '%C', '%L'])
+                .apply(color_hcl_percent, subset=['%H', '%C', '%L'])
                 .apply(color_p_percent, subset=['%P'])
                 .format(format_dict)
                 .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
@@ -856,7 +868,7 @@ def display_option_chain(df, access_token):
             st.subheader(f"Puts (PE) ({len(puts_df)})")
             st.dataframe(
                 puts_df[display_cols].style
-                .map(color_change, subset=['%H', '%C', '%L'])
+                .apply(color_hcl_percent, subset=['%H', '%C', '%L'])
                 .apply(color_p_percent, subset=['%P'])
                 .format(format_dict)
                 .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
@@ -868,7 +880,7 @@ def display_option_chain(df, access_token):
         st.subheader(f"Calls (CE) ({len(calls_df)})")
         st.dataframe(
             calls_df[display_cols].style
-            .map(color_change, subset=['%H', '%C', '%L'])
+            .apply(color_hcl_percent, subset=['%H', '%C', '%L'])
             .apply(color_p_percent, subset=['%P'])
             .format(format_dict)
             .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
@@ -880,7 +892,7 @@ def display_option_chain(df, access_token):
         st.subheader(f"Puts (PE) ({len(puts_df)})")
         st.dataframe(
             puts_df[display_cols].style
-            .map(color_change, subset=['%H', '%C', '%L'])
+            .apply(color_hcl_percent, subset=['%H', '%C', '%L'])
             .apply(color_p_percent, subset=['%P'])
             .format(format_dict)
             .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
