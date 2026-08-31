@@ -682,12 +682,13 @@ def display_option_chain(df, access_token):
         
     with col_f1:
         sc1, sc2, sc3 = st.columns(3)
-        # Default index=3 selects "%P" as the default filter view
-        filter_metric = sc1.selectbox("Filter View:", options=["%H", "%C", "%L", "%P"], index=3, key="filter_metric_select")
+        # Filter View now safely defaults to %C (index 1) and is STRICTLY for the range filters.
+        filter_metric = sc1.selectbox("Filter View:", options=["%H", "%C", "%L", "%P"], index=1, key="filter_metric_select")
         min_pct_input = sc2.text_input("🔺 Min % :", value="", placeholder="e.g. >=90")
         max_pct_input = sc3.text_input("🔻 Max % :", value="", placeholder="e.g. <=140")
         
     with col_f2:
+        # Sort is strictly handled via this Dropdown independent of the filter above
         sort_by = st.selectbox("↕️ Sort:", options=["%P", "%H", "%C", "%L", "Diff", "Lot Size", "Symbol", "Sr."], index=0, key="sort_by_select")
 
     with col_f3:
@@ -717,7 +718,7 @@ def display_option_chain(df, access_token):
         ).any(axis=1)
         df = df[search_mask]
 
-    # Apply % Range Filter
+    # Apply % Range Filter (Uses the Filter View purely for row filtration)
     if min_pct_input.strip():
         try:
             min_pct_val = float(min_pct_input.strip())
@@ -751,7 +752,7 @@ def display_option_chain(df, access_token):
     calls_df = df[df['OptionType'] == 'CE'].copy()
     puts_df = df[df['OptionType'] == 'PE'].copy()
 
-    # Apply Sorting
+    # Apply Sorting (STRICTLY uses the "Sort" Dropdown)
     sort_column = sort_by
     sort_ascending = False 
 
@@ -802,7 +803,7 @@ def display_option_chain(df, access_token):
         'Lot Size': '{:d}'
     }
 
-    # Render layout - Now strictly hiding index so only the real "Sr." column shows.
+    # Render layout - Strictly hiding index so only the real "Sr." column shows.
     if layout_view == "↔️ Split":
         col1, col2 = st.columns(2)
         with col1:
