@@ -767,12 +767,15 @@ def display_option_chain(df, access_token):
     if sort_column in puts_df.columns:
         puts_df = puts_df.sort_values(by=sort_column, ascending=sort_ascending)
 
-    # Insert Sr. as a true column AFTER sorting, guaranteeing 1 to N order.
-    calls_df.insert(0, 'Sr.', range(1, len(calls_df) + 1))
-    puts_df.insert(0, 'Sr.', range(1, len(puts_df) + 1))
+    # Overwrite the DataFrame index AFTER sorting, guaranteeing 1 to N order.
+    calls_df.index = range(1, len(calls_df) + 1)
+    calls_df.index.name = 'Sr.'
+    
+    puts_df.index = range(1, len(puts_df) + 1)
+    puts_df.index.name = 'Sr.'
 
     display_cols = [
-        'Sr.', 'Symbol', 'StrikePrice', 'ltp', '%P', trigger_col_name, '%H', 'JSTT-C', '%C', 
+        'Symbol', 'StrikePrice', 'ltp', '%P', trigger_col_name, '%H', 'JSTT-C', '%C', 
         'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'Trade Point Scrip'
     ]
     
@@ -803,7 +806,7 @@ def display_option_chain(df, access_token):
         'Lot Size': '{:d}'
     }
 
-    # Render layout - Strictly hiding index so only the real "Sr." column shows.
+    # Render layout - No hide_index parameter so 'Sr.' (index) appears natively
     if layout_view == "↔️ Split":
         col1, col2 = st.columns(2)
         with col1:
@@ -813,7 +816,6 @@ def display_option_chain(df, access_token):
                 .map(color_change, subset=['%H', '%C', '%L'])
                 .format(format_dict)
                 .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
-                hide_index=True,
                 use_container_width=True,
                 height=1800
             )
@@ -825,7 +827,6 @@ def display_option_chain(df, access_token):
                 .map(color_change, subset=['%H', '%C', '%L'])
                 .format(format_dict)
                 .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
-                hide_index=True,
                 use_container_width=True,
                 height=1800
             )
@@ -837,7 +838,6 @@ def display_option_chain(df, access_token):
             .map(color_change, subset=['%H', '%C', '%L'])
             .format(format_dict)
             .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
-            hide_index=True,
             use_container_width=True,
             height=1800
         )
@@ -849,7 +849,6 @@ def display_option_chain(df, access_token):
             .map(color_change, subset=['%H', '%C', '%L'])
             .format(format_dict)
             .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
-            hide_index=True,
             use_container_width=True,
             height=1800
         )
