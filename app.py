@@ -514,9 +514,10 @@ def fetch_ltp(instrument_keys, access_token, provider="Upstox", client_id=""):
         return {}
     
     results = {}
-    chunk_size = 100
     
     if provider == "Upstox":
+        # Upstox supports up to 500 keys per request securely
+        chunk_size = 500
         url = "https://api.upstox.com/v2/market-quote/ltp"
         headers = {
             'Accept': 'application/json',
@@ -544,6 +545,8 @@ def fetch_ltp(instrument_keys, access_token, provider="Upstox", client_id=""):
                 pass
                 
     elif provider == "Dhan":
+        # Dhan supports up to 1000 keys per request
+        chunk_size = 1000
         url = "https://api.dhan.co/v2/marketfeed/ltp"
         headers = {
             'Accept': 'application/json',
@@ -599,6 +602,7 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
             ltp_cache = fetched_data
         else:
             ltp_cache = load_ltp_cache()
+            st.warning(f"⚠️ Failed to fetch live LTP from {api_provider}. Make sure your token/credentials are valid. Displaying last cached data.")
         
         ltp_data = {k: ltp_cache.get(k, 0.0) for k in all_keys}
         df['ltp'] = df['instrument_key'].map(ltp_data).fillna(0.0)
