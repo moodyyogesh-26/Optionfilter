@@ -304,25 +304,25 @@ def process_uploaded_files(uploaded_files):
     csv_bytes = combined_df.to_csv(index=False).encode('utf-8')
     return csv_bytes, date_display
 
-def load_token():
+def load_api_creds():
     if os.path.exists(TOKEN_FILE):
         try:
             with open(TOKEN_FILE, 'r') as f:
                 data = json.load(f)
                 if data.get('date') == get_ist_now().strftime('%Y-%m-%d'):
-                    return data.get('token', '')
+                    # Backward compatibility for old token structure
+                    if 'token' in data and 'upstox_token' not in data:
+                        data['upstox_token'] = data.pop('token')
+                    return data
         except:
             pass
-    return ''
+    return {}
 
-def save_token(token):
+def save_api_creds(data_dict):
     try:
-        data = {
-            'date': get_ist_now().strftime('%Y-%m-%d'),
-            'token': token
-        }
+        data_dict['date'] = get_ist_now().strftime('%Y-%m-%d')
         with open(TOKEN_FILE, 'w') as f:
-            json.dump(data, f)
+            json.dump(data_dict, f)
     except:
         pass
 
@@ -509,42 +509,83 @@ def process_bhavcopy(bhav_file, df_json, target_expiry_index=0, strike_bhav_file
         st.error(f"Error processing Bhavcopy: {e}")
         return pd.DataFrame(), None, []
 
-def fetch_ltp(instrument_keys, access_token):
+def fetch_ltp(instrument_keys, access_token, provider="Upstox", client_id=""):
     if not access_token or not instrument_keys:
         return {}
-    
-    url = "https://api.upstox.com/v2/market-quote/ltp"
-    headers = {
-        'Accept': 'application/json',
-        'Authorization': f'Bearer {access_token}'
-    }
     
     results = {}
     chunk_size = 100
     
-    for i in range(0, len(instrument_keys), chunk_size):
-        chunk = instrument_keys[i:i + chunk_size]
-        params = {'instrument_key': ','.join(chunk)}
+    if provider == "Upstox":
+        url = "https://api.upstox.com/v2/market-quote/ltp"
+        headers = {
+            'Accept': 'application/json',
+            'Authorization': f'Bearer {access_token}'
+        }
         
-        try:
-            res = requests.get(url, headers=headers, params=params, timeout=5)
-            if res.status_code == 200:
-                data = res.json()
-                if data.get('status') == 'success':
-                    for k, v in data.get('data', {}).items():
-                        price = float(v.get('last_price', 0.0))
-                        clean_k = k.replace(':', '|')
-                        results[clean_k] = price
-                        token = v.get('instrument_token')
-                        if token:
-                            clean_token = token.replace(':', '|')
-                            results[clean_token] = price
-        except Exception:
-            pass
+        for i in range(0, len(instrument_keys), chunk_size):
+            chunk = instrument_keys[i:i + chunk_size]
+            params = {'instrument_key': ','.join(chunk)}
             
+            try:
+                res = requests.get(url, headers=headers, params=params, timeout=5)
+                if res.status_code == 200:
+                    data = res.json()
+                    if data.get('status') == 'success':
+                        for k, v in data.get('data', {}).items():
+                            price = float(v.get('last_price', 0.0))
+                            clean_k = k.replace(':', '|')
+                            results[clean_k] = price
+                            token = v.get('instrument_token')
+                            if token:
+                                clean_token = token.replace(':', '|')
+                                results[clean_token] = price
+            except Exception:
+                pass
+                
+    elif provider == "Dhan":
+        url = "https://api.dhan.co/v2/marketfeed/ltp"
+        headers = {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'access-token': access_token,
+            'client-id': client_id
+        }
+        
+        dhan_keys = []
+        key_map = {}
+        for k in instrument_keys:
+            try:
+                # Extract exchange token (e.g., from 'NSE_FO|49081' -> '49081')
+                token_str = k.split('|')[1] if '|' in k else k
+                dhan_keys.append(int(token_str))
+                key_map[str(token_str)] = k
+            except Exception:
+                pass
+                
+        for i in range(0, len(dhan_keys), chunk_size):
+            chunk = dhan_keys[i:i + chunk_size]
+            payload = {
+                "NSE_FNO": chunk
+            }
+            
+            try:
+                res = requests.post(url, headers=headers, json=payload, timeout=5)
+                if res.status_code == 200:
+                    data = res.json()
+                    if data.get('status') == 'success':
+                        fno_data = data.get('data', {}).get('NSE_FNO', {})
+                        for token, v in fno_data.items():
+                            price = float(v.get('last_price', 0.0))
+                            original_key = key_map.get(str(token))
+                            if original_key:
+                                results[original_key] = price
+            except Exception:
+                pass
+
     return results
 
-def display_option_chain(df, access_token):
+def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
     st.caption(f"Last Updated: {get_ist_now().strftime('%H:%M:%S')} IST")
     if df.empty:
         st.info("No data to display. Please upload JSTT Bhavcopy files in the sidebar.")
@@ -552,7 +593,7 @@ def display_option_chain(df, access_token):
 
     if access_token:
         all_keys = df['instrument_key'].dropna().unique().tolist()
-        fetched_data = fetch_ltp(all_keys, access_token)
+        fetched_data = fetch_ltp(all_keys, access_token, provider=api_provider, client_id=client_id)
         if fetched_data:
             save_ltp_cache(fetched_data)
             ltp_cache = fetched_data
@@ -563,7 +604,7 @@ def display_option_chain(df, access_token):
         df['ltp'] = df['instrument_key'].map(ltp_data).fillna(0.0)
     else:
         df['ltp'] = 0.0
-        st.warning("Enter Access Token in sidebar to see live LTP.")
+        st.warning(f"Enter Access Token for {api_provider} in sidebar to see live LTP.")
 
     def clean_ltp(row):
         ltp = row.get('ltp', 0.0)
@@ -922,10 +963,18 @@ def display_option_chain(df, access_token):
         )
 
 # Secret Handling (Client View Mode)
-is_client_view = "UPSTOX_ACCESS_TOKEN" in st.secrets
+is_client_view = "UPSTOX_ACCESS_TOKEN" in st.secrets or "DHAN_ACCESS_TOKEN" in st.secrets
 
 if is_client_view:
-    access_token = st.secrets["UPSTOX_ACCESS_TOKEN"]
+    if "DHAN_ACCESS_TOKEN" in st.secrets and "DHAN_CLIENT_ID" in st.secrets:
+        api_provider = "Dhan"
+        access_token = st.secrets["DHAN_ACCESS_TOKEN"]
+        client_id = st.secrets["DHAN_CLIENT_ID"]
+    else:
+        api_provider = "Upstox"
+        access_token = st.secrets.get("UPSTOX_ACCESS_TOKEN", "")
+        client_id = ""
+        
     st.markdown("""
     <style>
         [data-testid="stSidebar"] {display: none;}
@@ -941,11 +990,28 @@ else:
     with st.sidebar:
         st.title("Settings & Uploads")
         
-        saved_token = load_token()
-        access_token = st.text_input("Upstox Access Token", value=saved_token, type="password")
-        if access_token != saved_token:
-            save_token(access_token)
+        api_provider = st.radio("API Provider", ["Upstox", "Dhan"], index=0)
+        
+        creds = load_api_creds()
+        
+        if api_provider == "Upstox":
+            saved_token = creds.get('upstox_token', '')
+            access_token = st.text_input("Upstox Access Token", value=saved_token, type="password")
+            client_id = ""
+            if access_token != saved_token:
+                creds['upstox_token'] = access_token
+                save_api_creds(creds)
+        else:
+            saved_client_id = creds.get('dhan_client_id', '')
+            saved_dhan_token = creds.get('dhan_token', '')
+            client_id = st.text_input("Dhan Client ID", value=saved_client_id)
+            access_token = st.text_input("Dhan Access Token", value=saved_dhan_token, type="password")
             
+            if client_id != saved_client_id or access_token != saved_dhan_token:
+                creds['dhan_client_id'] = client_id
+                creds['dhan_token'] = access_token
+                save_api_creds(creds)
+                
         expiry_type = st.radio("Select Expiry", ["Current Month", "Next Month"], index=0)
         target_expiry_idx = 0 if expiry_type == "Current Month" else 1
 
@@ -995,7 +1061,6 @@ else:
 
         # Previous Day Bhavcopy Uploader
         st.subheader("2. Previous Day Bhavcopy")
-        # Checkbox defaults to False (Off). Toggles custom file vs ATM file handling.
         use_custom_prev_bhav = st.checkbox("Upload custom Previous Day Bhavcopy", value=False, key="use_prev_bhav_check")
         
         if use_custom_prev_bhav:
@@ -1057,7 +1122,6 @@ if not nse_json_df.empty:
     run_every = refresh_interval if auto_refresh else None
     strike_file = FILES.get('Strike_Selection') if os.path.exists(FILES.get('Strike_Selection', '')) else None
     
-    # Resolve the correct previous day bhavcopy source based on the user's toggle setting
     use_custom_prev = st.session_state.get("use_prev_bhav_check", False)
     if use_custom_prev:
         prev_file_path = FILES.get('Prev_Bhavcopy') if os.path.exists(FILES.get('Prev_Bhavcopy', '')) else None
@@ -1075,7 +1139,7 @@ if not nse_json_df.empty:
                 prev_bhav_file=prev_file_path
             )
             render_header(target_exp)
-            display_option_chain(df_wh, access_token)
+            display_option_chain(df_wh, access_token, api_provider=api_provider, client_id=client_id)
         show_JSTT_H()
     else:
         render_header()
