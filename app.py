@@ -310,7 +310,6 @@ def load_api_creds():
             with open(TOKEN_FILE, 'r') as f:
                 data = json.load(f)
                 if data.get('date') == get_ist_now().strftime('%Y-%m-%d'):
-                    # Backward compatibility for old token structure
                     if 'token' in data and 'upstox_token' not in data:
                         data['upstox_token'] = data.pop('token')
                     return data
@@ -325,6 +324,51 @@ def save_api_creds(data_dict):
             json.dump(data_dict, f)
     except:
         pass
+
+# NEW: Automated Definedge Session Key Generator
+def generate_definedge_session_key(api_token, api_secret, totp_code):
+    try:
+        # STEP 1: Generate OTP Token
+        url1 = f"https://signin.definedgesecurities.com/auth/realms/debroking/dsbpkc/login/{api_token}"
+        headers1 = {"api_secret": api_secret}
+        res1 = requests.get(url1, headers=headers1, timeout=10)
+        
+        if res1.status_code != 200:
+            return None, f"Step 1 Failed ({res1.status_code}): Invalid Token/Secret"
+            
+        res1_data = res1.json()
+        otp_token = res1_data.get("otp_token")
+        
+        if not otp_token:
+            return None, "otp_token not found in Step 1 response."
+
+        # STEP 2: Submit TOTP to get Session Key
+        url2 = "https://signin.definedgesecurities.com/auth/realms/debroking/dsbpkc/token"
+        payload = {
+            "client_id": "TRTP",
+            "grant_type": "password",
+            "client_secret": api_secret,
+            "otp_token": otp_token,
+            "otp": str(totp_code).strip()
+        }
+        headers2 = {"Content-Type": "application/x-www-form-urlencoded"}
+        
+        res2 = requests.post(url2, headers=headers2, data=payload, timeout=10)
+        
+        if res2.status_code != 200:
+            return None, f"Step 2 Failed ({res2.status_code}): Invalid TOTP code"
+            
+        res2_data = res2.json()
+        api_session_key = res2_data.get("api_session_key")
+        
+        if api_session_key:
+            return api_session_key, "Success"
+        else:
+            return None, "api_session_key not found in Step 2 response."
+            
+    except Exception as e:
+        return None, str(e)
+
 
 # Constant for NSE JSON
 NSE_JSON_PATH = 'NSE.json'
@@ -582,7 +626,6 @@ def fetch_ltp(instrument_keys, access_token, provider="Upstox", client_id=""):
                 pass
             return k, 0.0
 
-        # Max workers set conservatively to avoid triggering Too Many Requests 
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             futures_res = [executor.submit(fetch_single, key) for key in instrument_keys]
             for f in concurrent.futures.as_completed(futures_res):
@@ -834,28 +877,22 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
     
     # ---------------- DYNAMIC COLOR LOGIC ----------------
     
-    # Check if the user is actively filtering via the Min/Max text inputs
     is_filter_active = bool(min_pct_input.strip() or max_pct_input.strip())
     
-    # Green-only dynamic gradient shading exclusively for %H, %C, %L (starts at > 85%)
-    # If a filter is applied, the selected column is painted solid light gray instead to stand out.
     def color_hcl_percent(s):
         if color_toggle == "Off":
             return [''] * len(s)
             
         styles = []
         s_numeric = pd.to_numeric(s, errors='coerce').fillna(0)
-        
-        # Check if THIS specific column is the one being filtered
         is_filtered_col = is_filter_active and (s.name == filter_metric)
         
-        # Determine the maximum value above 85 to scale the gradient
         max_pos = s_numeric[s_numeric > 85].max() if not s_numeric[s_numeric > 85].empty else 86
-        range_pos = max_pos - 85 if max_pos > 85 else 1  # Guard against division by zero
+        range_pos = max_pos - 85 if max_pos > 85 else 1
         
         for val in s_numeric:
             if is_filtered_col:
-                styles.append('background-color: #d3d3d3; color: black;') # Overwrite with Light gray
+                styles.append('background-color: #d3d3d3; color: black;')
                 continue
                 
             if val <= 85:
@@ -868,16 +905,12 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
                 
         return styles
 
-    # Existing red/green dynamic gradient shading exclusively for %P
-    # If a filter is applied, the selected column is painted solid light gray instead to stand out.
     def color_p_percent(s):
         if color_toggle == "Off":
             return [''] * len(s)
             
         styles = []
         s_numeric = pd.to_numeric(s, errors='coerce').fillna(0)
-        
-        # Check if THIS specific column is the one being filtered
         is_filtered_col = is_filter_active and (s.name == filter_metric)
         
         max_pos = s_numeric[s_numeric > 0].max() if not s_numeric[s_numeric > 0].empty else 1
@@ -885,7 +918,7 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
         
         for val in s_numeric:
             if is_filtered_col:
-                styles.append('background-color: #d3d3d3; color: black;') # Overwrite with Light gray
+                styles.append('background-color: #d3d3d3; color: black;')
                 continue
                 
             if val == 0:
@@ -1010,8 +1043,39 @@ else:
                 creds['upstox_token'] = access_token
                 save_api_creds(creds)
         else:
+            st.subheader("Definedge API Authentication")
+            
+            # --- Automated Session Key Generator ---
+            st.caption("Generate Session Key Automatically:")
+            d_token = st.text_input("Definedge API Token", value=creds.get('def_api_token', ''))
+            d_secret = st.text_input("Definedge API Secret", value=creds.get('def_api_secret', ''), type="password")
+            d_totp = st.text_input("TOTP / Authenticator Code (6 digits)", max_chars=6)
+            
+            if st.button("🔄 Generate Session Key", use_container_width=True):
+                if d_token and d_secret and d_totp:
+                    # Save token and secret for convenience
+                    creds['def_api_token'] = d_token
+                    creds['def_api_secret'] = d_secret
+                    save_api_creds(creds)
+                    
+                    with st.spinner("Generating Session Key..."):
+                        new_key, msg = generate_definedge_session_key(d_token, d_secret, d_totp)
+                        if new_key:
+                            creds['definedge_token'] = new_key
+                            save_api_creds(creds)
+                            st.success("Session Key generated successfully!")
+                            time.sleep(1.5)
+                            st.rerun()
+                        else:
+                            st.error(msg)
+                else:
+                    st.warning("Please fill your API Token, API Secret, and TOTP code.")
+            
+            st.markdown("---")
+            
+            # --- Manual Session Key Input ---
             saved_definedge_token = creds.get('definedge_token', '')
-            access_token = st.text_input("Definedge API Session Key", value=saved_definedge_token, type="password")
+            access_token = st.text_input("Current API Session Key (Manual)", value=saved_definedge_token, type="password")
             client_id = ""
             if access_token != saved_definedge_token:
                 creds['definedge_token'] = access_token
