@@ -310,7 +310,6 @@ def load_api_creds():
             with open(TOKEN_FILE, 'r') as f:
                 data = json.load(f)
                 if data.get('date') == get_ist_now().strftime('%Y-%m-%d'):
-                    # Backward compatibility for old token structure
                     if 'token' in data and 'upstox_token' not in data:
                         data['upstox_token'] = data.pop('token')
                     return data
@@ -516,7 +515,6 @@ def fetch_ltp(instrument_keys, access_token, provider="Upstox", client_id=""):
     results = {}
     
     if provider == "Upstox":
-        # Upstox supports up to 500 keys per request securely
         chunk_size = 500
         url = "https://api.upstox.com/v2/market-quote/ltp"
         headers = {
@@ -544,47 +542,51 @@ def fetch_ltp(instrument_keys, access_token, provider="Upstox", client_id=""):
             except Exception:
                 pass
                 
-    elif provider == "Dhan":
-        # Dhan supports up to 1000 keys per request
-        chunk_size = 1000
-        url = "https://api.dhan.co/v2/marketfeed/ltp"
+    elif provider == "Definedge":
+        url_base = "https://integrate.definedgesecurities.com/dart/v1/quotes"
         headers = {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'access-token': access_token,
-            'client-id': client_id
+            'Authorization': access_token,
+            'Content-Type': 'application/json'
         }
         
-        dhan_keys = []
-        key_map = {}
-        for k in instrument_keys:
+        def fetch_single(k):
             try:
-                # Extract exchange token (e.g., from 'NSE_FO|49081' -> '49081')
-                token_str = k.split('|')[1] if '|' in k else k
-                dhan_keys.append(int(token_str))
-                key_map[str(token_str)] = k
-            except Exception:
-                pass
-                
-        for i in range(0, len(dhan_keys), chunk_size):
-            chunk = dhan_keys[i:i + chunk_size]
-            payload = {
-                "NSE_FNO": chunk
-            }
-            
-            try:
-                res = requests.post(url, headers=headers, json=payload, timeout=5)
+                if '|' in k:
+                    exch_str, token_str = k.split('|')
+                    exch = 'NFO' if exch_str == 'NSE_FO' else 'NSE'
+                else:
+                    exch = 'NSE'
+                    token_str = k
+                    
+                url = f"{url_base}/{exch}/{token_str}"
+                res = requests.get(url, headers=headers, timeout=5)
                 if res.status_code == 200:
                     data = res.json()
-                    if data.get('status') == 'success':
-                        fno_data = data.get('data', {}).get('NSE_FNO', {})
-                        for token, v in fno_data.items():
-                            price = float(v.get('last_price', 0.0))
-                            original_key = key_map.get(str(token))
-                            if original_key:
-                                results[original_key] = price
+                    
+                    def find_price(obj):
+                        if isinstance(obj, dict):
+                            for k_obj, v_obj in obj.items():
+                                if str(k_obj).lower() in ['ltp', 'last_price', 'lastprice', 'lasttradedprice']:
+                                    try: return float(v_obj)
+                                    except: pass
+                            for v_obj in obj.values():
+                                p = find_price(v_obj)
+                                if p: return p
+                        return None
+                    
+                    price = find_price(data)
+                    if price:
+                        return k, price
             except Exception:
                 pass
+            return k, 0.0
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            futures_res = [executor.submit(fetch_single, key) for key in instrument_keys]
+            for f in concurrent.futures.as_completed(futures_res):
+                k, price = f.result()
+                if price > 0:
+                    results[k] = price
 
     return results
 
@@ -834,7 +836,6 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
     is_filter_active = bool(min_pct_input.strip() or max_pct_input.strip())
     
     # Green-only dynamic gradient shading exclusively for %H, %C, %L (starts at > 85%)
-    # If a filter is applied, the selected column is painted solid light gray instead to stand out.
     def color_hcl_percent(s):
         if color_toggle == "Off":
             return [''] * len(s)
@@ -842,16 +843,14 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
         styles = []
         s_numeric = pd.to_numeric(s, errors='coerce').fillna(0)
         
-        # Check if THIS specific column is the one being filtered
         is_filtered_col = is_filter_active and (s.name == filter_metric)
         
-        # Determine the maximum value above 85 to scale the gradient
         max_pos = s_numeric[s_numeric > 85].max() if not s_numeric[s_numeric > 85].empty else 86
-        range_pos = max_pos - 85 if max_pos > 85 else 1  # Guard against division by zero
+        range_pos = max_pos - 85 if max_pos > 85 else 1
         
         for val in s_numeric:
             if is_filtered_col:
-                styles.append('background-color: #d3d3d3; color: black;') # Overwrite with Light gray
+                styles.append('background-color: #d3d3d3; color: black;')
                 continue
                 
             if val <= 85:
@@ -865,7 +864,6 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
         return styles
 
     # Existing red/green dynamic gradient shading exclusively for %P
-    # If a filter is applied, the selected column is painted solid light gray instead to stand out.
     def color_p_percent(s):
         if color_toggle == "Off":
             return [''] * len(s)
@@ -873,7 +871,6 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
         styles = []
         s_numeric = pd.to_numeric(s, errors='coerce').fillna(0)
         
-        # Check if THIS specific column is the one being filtered
         is_filtered_col = is_filter_active and (s.name == filter_metric)
         
         max_pos = s_numeric[s_numeric > 0].max() if not s_numeric[s_numeric > 0].empty else 1
@@ -881,7 +878,7 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
         
         for val in s_numeric:
             if is_filtered_col:
-                styles.append('background-color: #d3d3d3; color: black;') # Overwrite with Light gray
+                styles.append('background-color: #d3d3d3; color: black;')
                 continue
                 
             if val == 0:
@@ -915,7 +912,7 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
         'Lot Size': '{:d}'
     }
 
-    # Render layout
+    # Render layout - No hide_index parameter so the 'Sr.' index is displayed natively.
     if layout_view == "↔️ Split":
         col1, col2 = st.columns(2)
         with col1:
@@ -967,13 +964,13 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
         )
 
 # Secret Handling (Client View Mode)
-is_client_view = "UPSTOX_ACCESS_TOKEN" in st.secrets or "DHAN_ACCESS_TOKEN" in st.secrets
+is_client_view = "UPSTOX_ACCESS_TOKEN" in st.secrets or "DEFINEDGE_ACCESS_TOKEN" in st.secrets
 
 if is_client_view:
-    if "DHAN_ACCESS_TOKEN" in st.secrets and "DHAN_CLIENT_ID" in st.secrets:
-        api_provider = "Dhan"
-        access_token = st.secrets["DHAN_ACCESS_TOKEN"]
-        client_id = st.secrets["DHAN_CLIENT_ID"]
+    if "DEFINEDGE_ACCESS_TOKEN" in st.secrets:
+        api_provider = "Definedge"
+        access_token = st.secrets["DEFINEDGE_ACCESS_TOKEN"]
+        client_id = ""
     else:
         api_provider = "Upstox"
         access_token = st.secrets.get("UPSTOX_ACCESS_TOKEN", "")
@@ -994,7 +991,7 @@ else:
     with st.sidebar:
         st.title("Settings & Uploads")
         
-        api_provider = st.radio("API Provider", ["Upstox", "Dhan"], index=0)
+        api_provider = st.radio("API Provider", ["Upstox", "Definedge"], index=0)
         
         creds = load_api_creds()
         
@@ -1006,14 +1003,11 @@ else:
                 creds['upstox_token'] = access_token
                 save_api_creds(creds)
         else:
-            saved_client_id = creds.get('dhan_client_id', '')
-            saved_dhan_token = creds.get('dhan_token', '')
-            client_id = st.text_input("Dhan Client ID", value=saved_client_id)
-            access_token = st.text_input("Dhan Access Token", value=saved_dhan_token, type="password")
-            
-            if client_id != saved_client_id or access_token != saved_dhan_token:
-                creds['dhan_client_id'] = client_id
-                creds['dhan_token'] = access_token
+            saved_definedge_token = creds.get('definedge_token', '')
+            access_token = st.text_input("Definedge API Session Key", value=saved_definedge_token, type="password")
+            client_id = ""
+            if access_token != saved_definedge_token:
+                creds['definedge_token'] = access_token
                 save_api_creds(creds)
                 
         expiry_type = st.radio("Select Expiry", ["Current Month", "Next Month"], index=0)
