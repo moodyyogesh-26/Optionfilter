@@ -310,6 +310,7 @@ def load_api_creds():
             with open(TOKEN_FILE, 'r') as f:
                 data = json.load(f)
                 if data.get('date') == get_ist_now().strftime('%Y-%m-%d'):
+                    # Backward compatibility for old token structure
                     if 'token' in data and 'upstox_token' not in data:
                         data['upstox_token'] = data.pop('token')
                     return data
@@ -325,7 +326,7 @@ def save_api_creds(data_dict):
     except:
         pass
 
-# NEW: Automated Definedge Session Key Generator
+# Automated Definedge Session Key Generator
 def generate_definedge_session_key(api_token, api_secret, totp_code):
     try:
         # STEP 1: Generate OTP Token
@@ -351,9 +352,9 @@ def generate_definedge_session_key(api_token, api_secret, totp_code):
             "otp_token": otp_token,
             "otp": str(totp_code).strip()
         }
-        headers2 = {"Content-Type": "application/x-www-form-urlencoded"}
+        headers2 = {"Content-type": "application/json"}
         
-        res2 = requests.post(url2, headers=headers2, data=payload, timeout=10)
+        res2 = requests.post(url2, headers=headers2, json=payload, timeout=10)
         
         if res2.status_code != 200:
             return None, f"Step 2 Failed ({res2.status_code}): Invalid TOTP code"
