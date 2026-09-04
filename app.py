@@ -310,6 +310,7 @@ def load_api_creds():
             with open(TOKEN_FILE, 'r') as f:
                 data = json.load(f)
                 if data.get('date') == get_ist_now().strftime('%Y-%m-%d'):
+                    # Backward compatibility for old token structure
                     if 'token' in data and 'upstox_token' not in data:
                         data['upstox_token'] = data.pop('token')
                     return data
@@ -581,7 +582,8 @@ def fetch_ltp(instrument_keys, access_token, provider="Upstox", client_id=""):
                 pass
             return k, 0.0
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        # Max workers set conservatively to avoid triggering Too Many Requests 
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             futures_res = [executor.submit(fetch_single, key) for key in instrument_keys]
             for f in concurrent.futures.as_completed(futures_res):
                 k, price = f.result()
@@ -836,6 +838,7 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
     is_filter_active = bool(min_pct_input.strip() or max_pct_input.strip())
     
     # Green-only dynamic gradient shading exclusively for %H, %C, %L (starts at > 85%)
+    # If a filter is applied, the selected column is painted solid light gray instead to stand out.
     def color_hcl_percent(s):
         if color_toggle == "Off":
             return [''] * len(s)
@@ -843,14 +846,16 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
         styles = []
         s_numeric = pd.to_numeric(s, errors='coerce').fillna(0)
         
+        # Check if THIS specific column is the one being filtered
         is_filtered_col = is_filter_active and (s.name == filter_metric)
         
+        # Determine the maximum value above 85 to scale the gradient
         max_pos = s_numeric[s_numeric > 85].max() if not s_numeric[s_numeric > 85].empty else 86
-        range_pos = max_pos - 85 if max_pos > 85 else 1
+        range_pos = max_pos - 85 if max_pos > 85 else 1  # Guard against division by zero
         
         for val in s_numeric:
             if is_filtered_col:
-                styles.append('background-color: #d3d3d3; color: black;')
+                styles.append('background-color: #d3d3d3; color: black;') # Overwrite with Light gray
                 continue
                 
             if val <= 85:
@@ -864,6 +869,7 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
         return styles
 
     # Existing red/green dynamic gradient shading exclusively for %P
+    # If a filter is applied, the selected column is painted solid light gray instead to stand out.
     def color_p_percent(s):
         if color_toggle == "Off":
             return [''] * len(s)
@@ -871,6 +877,7 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
         styles = []
         s_numeric = pd.to_numeric(s, errors='coerce').fillna(0)
         
+        # Check if THIS specific column is the one being filtered
         is_filtered_col = is_filter_active and (s.name == filter_metric)
         
         max_pos = s_numeric[s_numeric > 0].max() if not s_numeric[s_numeric > 0].empty else 1
@@ -878,7 +885,7 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
         
         for val in s_numeric:
             if is_filtered_col:
-                styles.append('background-color: #d3d3d3; color: black;')
+                styles.append('background-color: #d3d3d3; color: black;') # Overwrite with Light gray
                 continue
                 
             if val == 0:
@@ -912,7 +919,7 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
         'Lot Size': '{:d}'
     }
 
-    # Render layout - No hide_index parameter so the 'Sr.' index is displayed natively.
+    # Render layout
     if layout_view == "↔️ Split":
         col1, col2 = st.columns(2)
         with col1:
