@@ -315,7 +315,6 @@ def load_api_creds():
             with open(TOKEN_FILE, 'r') as f:
                 data = json.load(f)
                 if data.get('date') == get_ist_now().strftime('%Y-%m-%d'):
-                    # Backward compatibility for old token structure
                     if 'token' in data and 'upstox_token' not in data:
                         data['upstox_token'] = data.pop('token')
                     return data
@@ -494,7 +493,7 @@ def process_bhavcopy(bhav_file, df_json, target_expiry_index=0, strike_bhav_file
         # Shared strike formatting: remove trailing '.0'
         strike_str = final_df['StrikePrice'].astype(str).str.replace(r'\.0$', '', regex=True)
 
-        # --- NEW SCRIP FORMAT (e.g. "BSE SEP 3400 CE") ---
+        # Scrip format (e.g. "BSE SEP 3400 CE")
         month_str = final_df['ExpiryDate'].dt.strftime('%b').str.upper()
         final_df['Scrip'] = (
             final_df['Symbol'] + " " + 
@@ -840,8 +839,8 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
 
     display_cols = [
         'Symbol', 'StrikePrice', 'ltp', '%P', trigger_col_name, '%H', 'JSTT-C', '%C', 
-        'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'Trade Point Scrip'
-    ] #, 'Scrip'
+        'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'Trade Point Scrip', 'Scrip'
+    ]
     
     display_cols = [col for col in display_cols if col in calls_df.columns]
     
@@ -932,7 +931,7 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
         'Lot Size': '{:d}'
     }
 
-    # Render layout
+    # Render layout with column_config to hide 'Scrip' by default
     if layout_view == "↔️ Split":
         col1, col2 = st.columns(2)
         with col1:
@@ -943,6 +942,7 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
                 .apply(color_p_percent, subset=['%P'])
                 .format(format_dict)
                 .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
+                column_config={"Scrip": None},
                 use_container_width=True,
                 height=1800
             )
@@ -955,6 +955,7 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
                 .apply(color_p_percent, subset=['%P'])
                 .format(format_dict)
                 .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
+                column_config={"Scrip": None},
                 use_container_width=True,
                 height=1800
             )
@@ -967,6 +968,7 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
             .apply(color_p_percent, subset=['%P'])
             .format(format_dict)
             .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
+            column_config={"Scrip": None},
             use_container_width=True,
             height=1800
         )
@@ -979,6 +981,7 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
             .apply(color_p_percent, subset=['%P'])
             .format(format_dict)
             .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
+            column_config={"Scrip": None},
             use_container_width=True,
             height=1800
         )
