@@ -839,8 +839,8 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
     puts_df.index.name = 'Sr.'
 
     display_cols = [
-        'Symbol', 'Scrip', 'StrikePrice', 'ltp', '%P', trigger_col_name, '%H', 'JSTT-C', '%C', 
-        'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'Trade Point Scrip'
+        'Symbol', 'StrikePrice', 'ltp', '%P', trigger_col_name, '%H', 'JSTT-C', '%C', 
+        'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'Trade Point Scrip', 'Scrip'
     ]
     
     display_cols = [col for col in display_cols if col in calls_df.columns]
