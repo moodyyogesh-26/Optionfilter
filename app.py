@@ -105,8 +105,13 @@ def render_header(target_exp=None):
     
     expiry_html = ''
     if target_exp:
+        exp_date = pd.to_datetime(target_exp).date()
+        today = get_ist_now().date()
+        days_left = max(0, (exp_date - today).days) 
+        
         exp_str = target_exp.strftime('%d-%b-%Y') if hasattr(target_exp, 'strftime') else str(target_exp)
-        expiry_html = f'<div style="background-color: #e0f2fe; color: #0369a1; padding: 6px 14px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; border: 1px solid #bae6fd; display: flex; align-items: center; gap: 6px; white-space: nowrap; margin-left: auto;"><span>📅 Expiry:</span> <strong style="color: #0284c7;">{exp_str}</strong></div>'
+        
+        expiry_html = f'<div style="background-color: #e0f2fe; color: #0369a1; padding: 6px 14px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; border: 1px solid #bae6fd; display: flex; align-items: center; gap: 6px; white-space: nowrap; margin-left: auto;"><span style="background: #bae6fd; padding: 2px 8px; border-radius: 4px; color: #075985; margin-right: 4px;">⏳ T-{days_left}</span><span>📅 Expiry:</span> <strong style="color: #0284c7;">{exp_str}</strong></div>'
         
     st.markdown(f"""
 <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.5rem; margin-bottom: 1.2rem; flex-wrap: wrap; gap: 16px;">
@@ -489,6 +494,15 @@ def process_bhavcopy(bhav_file, df_json, target_expiry_index=0, strike_bhav_file
         # Shared strike formatting: remove trailing '.0'
         strike_str = final_df['StrikePrice'].astype(str).str.replace(r'\.0$', '', regex=True)
 
+        # --- NEW SCRIP FORMAT (e.g. "BSE SEP 3400 CE") ---
+        month_str = final_df['ExpiryDate'].dt.strftime('%b').str.upper()
+        final_df['Scrip'] = (
+            final_df['Symbol'] + " " + 
+            month_str + " " + 
+            strike_str + " " + 
+            final_df['OptionType']
+        )
+
         # 1. Tradingview Scrip
         formatted_date_tv = final_df['ExpiryDate'].dt.strftime('%y%m%d')
         opt_type_tv = final_df['OptionType'].str[0]
@@ -582,7 +596,6 @@ def fetch_ltp(instrument_keys, access_token, provider="Upstox", client_id=""):
                 pass
             return k, 0.0
 
-        # Max workers set conservatively to avoid triggering Too Many Requests 
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             futures_res = [executor.submit(fetch_single, key) for key in instrument_keys]
             for f in concurrent.futures.as_completed(futures_res):
@@ -826,7 +839,7 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
     puts_df.index.name = 'Sr.'
 
     display_cols = [
-        'Symbol', 'StrikePrice', 'ltp', '%P', trigger_col_name, '%H', 'JSTT-C', '%C', 
+        'Symbol', 'Scrip', 'StrikePrice', 'ltp', '%P', trigger_col_name, '%H', 'JSTT-C', '%C', 
         'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'Trade Point Scrip'
     ]
     
