@@ -350,27 +350,24 @@ def login_definedge_step1(api_token, api_secret):
         return None, f"Definedge Step 1 Exception: {str(e)}"
 
 # --- MANUAL DEFINEDGE LOGIN: STEP 2 (Verify OTP) ---
-def login_definedge_step2(api_secret, otp_token, manual_otp):
+def login_definedge_step2(api_token, api_secret, otp_token, manual_otp):
     try:
         step2_url = "https://signin.definedgesecurities.com/auth/realms/debroking/dsbpkc/token"
+        
+        # FIX: Definedge requires exactly these 4 JSON keys. No OAuth fluff.
         payload2 = {
-            "client_id": "TRTP",
-            "grant_type": "password",
-            "client_secret": api_secret,
+            "api_token": api_token,
+            "api_secret": api_secret,
             "otp_token": otp_token,
             "otp": str(manual_otp).strip()
         }
         
-        # FIX: The server is rejecting the default content type. 
-        # We explicitly force the standard Keycloak form-urlencoded format first.
-        headers2 = {"Content-Type": "application/x-www-form-urlencoded"}
-        res2 = requests.post(step2_url, data=payload2, headers=headers2, timeout=10)
+        headers2 = {
+            "Content-Type": "application/json", 
+            "Accept": "application/json"
+        }
         
-        # Auto-Fallback: If Definedge customized their server to strictly expect JSON instead, 
-        # it throws RESTEASY003065 or a 415 error. We instantly retry with JSON.
-        if "RESTEASY003065" in res2.text or res2.status_code == 415:
-            headers2_alt = {"Content-Type": "application/json", "Accept": "application/json"}
-            res2 = requests.post(step2_url, json=payload2, headers=headers2_alt, timeout=10)
+        res2 = requests.post(step2_url, json=payload2, headers=headers2, timeout=10)
             
         if res2.status_code != 200:
             return None, f"Definedge Login Step 2 Failed: {res2.text}"
@@ -1086,7 +1083,7 @@ if is_client_view:
                 col1, col2 = st.columns([1, 4])
                 if col1.button("Verify & Login"):
                     with st.spinner("Logging in..."):
-                        session_key, msg = login_definedge_step2(api_secret, st.session_state['definedge_otp_token'], manual_otp)
+                        session_key, msg = login_definedge_step2(api_token, api_secret, st.session_state['definedge_otp_token'], manual_otp)
                         if session_key:
                             st.session_state['definedge_session_key'] = session_key
                             st.success("Success! Loading Dashboard...")
@@ -1174,7 +1171,7 @@ else:
                     col1, col2 = st.columns(2)
                     if col1.button("Verify OTP"):
                         with st.spinner("Logging in..."):
-                            session_key, msg = login_definedge_step2(api_secret, st.session_state['definedge_otp_token'], manual_otp)
+                            session_key, msg = login_definedge_step2(api_token, api_secret, st.session_state['definedge_otp_token'], manual_otp)
                             if session_key:
                                 creds['definedge_session_key'] = session_key
                                 save_api_creds(creds)
