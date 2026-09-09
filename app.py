@@ -12,7 +12,6 @@ from datetime import datetime, timedelta, timezone
 import concurrent.futures
 import zipfile
 import io
-import pyotp
 
 # IST Offset
 IST_OFFSET = timedelta(hours=5, minutes=30)
@@ -331,10 +330,9 @@ def save_api_creds(data_dict):
     except:
         pass
 
-# --- NEW AUTOMATED DEFINEDGE LOGIN FUNCTION ---
-def login_definedge(api_token, api_secret, totp_key):
+# --- MANUAL DEFINEDGE LOGIN: STEP 1 (Request OTP) ---
+def login_definedge_step1(api_token, api_secret):
     try:
-        # Step 1: Request OTP Token
         step1_url = f"https://signin.definedgesecurities.com/auth/realms/debroking/dsbpkc/login/{api_token}"
         headers1 = {"api_secret": api_secret}
         res1 = requests.get(step1_url, headers=headers1, timeout=10)
@@ -344,31 +342,23 @@ def login_definedge(api_token, api_secret, totp_key):
         data1 = res1.json()
         otp_token = data1.get("otp_token")
         
-        if not otp_token:
+        if otp_token:
+            return otp_token, "OTP Sent Successfully."
+        else:
             return None, "Login failed: No otp_token received in Step 1."
+    except Exception as e:
+        return None, f"Definedge Step 1 Exception: {str(e)}"
 
-        # Clean the TOTP key to remove accidental spaces, hyphens, and make it uppercase
-        clean_totp_key = str(totp_key).strip().upper()
-        clean_totp_key = re.sub(r'[\s\-]', '', clean_totp_key)
-        
-        # Guardrail: Check if the string contains invalid characters before pyotp crashes
-        if not re.match(r'^[A-Z2-7=]+$', clean_totp_key):
-            return None, "❌ Invalid TOTP Secret entered! Base32 Secrets can only contain letters A-Z and numbers 2-7. Please check that you pasted the correct Authenticator setup code, not your password or a 6-digit OTP."
-
-        try:
-            # Generate fresh 6-digit TOTP
-            totp_code = pyotp.TOTP(clean_totp_key).now()
-        except Exception as e:
-            return None, f"Failed to generate TOTP: {str(e)}. Please check your Base32 Secret."
-
-        # Step 2: Finalize Login & Retrieve Session Key
+# --- MANUAL DEFINEDGE LOGIN: STEP 2 (Verify OTP) ---
+def login_definedge_step2(api_secret, otp_token, manual_otp):
+    try:
         step2_url = "https://signin.definedgesecurities.com/auth/realms/debroking/dsbpkc/token"
         payload2 = {
             "client_id": "TRTP",
             "grant_type": "password",
             "client_secret": api_secret,
             "otp_token": otp_token,
-            "otp": totp_code
+            "otp": str(manual_otp).strip()
         }
         res2 = requests.post(step2_url, data=payload2, timeout=10)
         
@@ -382,9 +372,8 @@ def login_definedge(api_token, api_secret, totp_key):
             return api_session_key, "Success"
         else:
             return None, "Login successful but no api_session_key found in response."
-            
     except Exception as e:
-        return None, f"Definedge Login Exception: {str(e)}"
+        return None, f"Definedge Step 2 Exception: {str(e)}"
 
 # Constant for NSE JSON
 NSE_JSON_PATH = 'NSE.json'
@@ -674,7 +663,7 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
             ltp_cache = fetched_data
         else:
             ltp_cache = load_ltp_cache()
-            st.warning(f"⚠️ Failed to fetch live LTP from {api_provider}. Make sure your token/credentials are valid. Displaying last cached data.")
+            st.warning(f"⚠️ Failed to fetch live LTP from {api_provider}. Make sure your credentials are valid. Displaying last cached data.")
         
         ltp_data = {k: ltp_cache.get(k, 0.0) for k in all_keys}
         df['ltp'] = df['instrument_key'].map(ltp_data).fillna(0.0)
@@ -1047,39 +1036,77 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
             height=1800
         )
 
-# Secret Handling (Client View Mode)
+# Secret Handling (Client View Mode vs Sidebar Admin Mode)
 is_client_view = "UPSTOX_ACCESS_TOKEN" in st.secrets or ("DEFINEDGE_API_TOKEN" in st.secrets and "DEFINEDGE_API_SECRET" in st.secrets)
 
 if is_client_view:
     if "DEFINEDGE_API_TOKEN" in st.secrets:
         api_provider = "Definedge"
-        # Only login once per session if in client view
-        if 'definedge_session_key' not in st.session_state:
-            key, msg = login_definedge(
-                st.secrets["DEFINEDGE_API_TOKEN"], 
-                st.secrets["DEFINEDGE_API_SECRET"], 
-                st.secrets["DEFINEDGE_TOTP_KEY"]
-            )
-            if key:
-                st.session_state['definedge_session_key'] = key
+        api_token = st.secrets["DEFINEDGE_API_TOKEN"]
+        api_secret = st.secrets["DEFINEDGE_API_SECRET"]
+        
         access_token = st.session_state.get('definedge_session_key', "")
         client_id = ""
+        
+        st.markdown("""
+        <style>
+            [data-testid="stSidebar"] {display: none;}
+            .block-container {
+                padding-top: 3.5rem !important;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # If we don't have a valid session key, we must interrupt the app to ask for OTP
+        if not access_token:
+            render_header()
+            st.info("🔒 Definedge Authentication Required")
+            
+            if 'definedge_otp_token' not in st.session_state:
+                if st.button("Request Login OTP"):
+                    with st.spinner("Requesting OTP to your mobile/email..."):
+                        otp_token, msg = login_definedge_step1(api_token, api_secret)
+                        if otp_token:
+                            st.session_state['definedge_otp_token'] = otp_token
+                            st.rerun()
+                        else:
+                            st.error(msg)
+            else:
+                manual_otp = st.text_input("Enter the 6-Digit OTP you received", max_chars=6)
+                col1, col2 = st.columns([1, 4])
+                if col1.button("Verify & Login"):
+                    with st.spinner("Logging in..."):
+                        session_key, msg = login_definedge_step2(api_secret, st.session_state['definedge_otp_token'], manual_otp)
+                        if session_key:
+                            st.session_state['definedge_session_key'] = session_key
+                            st.success("Success! Loading Dashboard...")
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error(msg)
+                if col2.button("Cancel / Resend"):
+                    del st.session_state['definedge_otp_token']
+                    st.rerun()
+            st.stop() # Prevents the rest of the app from rendering until logged in
+            
     else:
         api_provider = "Upstox"
         access_token = st.secrets.get("UPSTOX_ACCESS_TOKEN", "")
         client_id = ""
         
-    st.markdown("""
-    <style>
-        [data-testid="stSidebar"] {display: none;}
-        .block-container {
-            padding-top: 3.5rem !important;
-        }
-    </style>
-    """, unsafe_allow_html=True)
+        st.markdown("""
+        <style>
+            [data-testid="stSidebar"] {display: none;}
+            .block-container {
+                padding-top: 3.5rem !important;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+
     auto_refresh = True
     refresh_interval = 15
     target_expiry_idx = 0
+
 else:
     with st.sidebar:
         st.title("Settings & Uploads")
@@ -1098,34 +1125,66 @@ else:
         else:
             saved_definedge_token = creds.get('definedge_token', '')
             saved_definedge_secret = creds.get('definedge_secret', '')
-            saved_definedge_totp = creds.get('definedge_totp', '')
             
             api_token = st.text_input("Definedge API Token", value=saved_definedge_token, type="password")
             api_secret = st.text_input("Definedge API Secret", value=saved_definedge_secret, type="password")
-            totp_key = st.text_input("Definedge TOTP Base32 Secret", value=saved_definedge_totp, type="password")
             
-            # If any of the inputs change, clear the saved session key
-            if api_token != saved_definedge_token or api_secret != saved_definedge_secret or totp_key != saved_definedge_totp:
+            # If the base credentials change, completely log the user out
+            if api_token != saved_definedge_token or api_secret != saved_definedge_secret:
                 creds['definedge_token'] = api_token
                 creds['definedge_secret'] = api_secret
-                creds['definedge_totp'] = totp_key
                 creds['definedge_session_key'] = ''
                 save_api_creds(creds)
+                if 'definedge_otp_token' in st.session_state:
+                    del st.session_state['definedge_otp_token']
             
             client_id = ""
             access_token = creds.get('definedge_session_key', '')
             
-            # Automatically fetch a new session key if credentials exist but session key is empty
-            if api_token and api_secret and totp_key and not access_token:
-                with st.spinner("Authenticating with Definedge..."):
-                    session_key, msg = login_definedge(api_token, api_secret, totp_key)
-                    if session_key:
-                        access_token = session_key
-                        creds['definedge_session_key'] = session_key
-                        save_api_creds(creds)
-                        st.success("Successfully logged into Definedge!")
-                    else:
-                        st.error(msg)
+            if api_token and api_secret and not access_token:
+                st.markdown("---")
+                st.write("**Manual OTP Login**")
+                
+                # Step 1: Request OTP
+                if 'definedge_otp_token' not in st.session_state:
+                    if st.button("Send OTP", use_container_width=True):
+                        with st.spinner("Requesting OTP..."):
+                            otp_token, msg = login_definedge_step1(api_token, api_secret)
+                            if otp_token:
+                                st.session_state['definedge_otp_token'] = otp_token
+                                st.success("OTP Sent!")
+                                time.sleep(1)
+                                st.rerun()
+                            else:
+                                st.error(msg)
+                
+                # Step 2: Verify OTP
+                else:
+                    manual_otp = st.text_input("Enter 6-Digit OTP", max_chars=6)
+                    col1, col2 = st.columns(2)
+                    if col1.button("Verify OTP"):
+                        with st.spinner("Logging in..."):
+                            session_key, msg = login_definedge_step2(api_secret, st.session_state['definedge_otp_token'], manual_otp)
+                            if session_key:
+                                creds['definedge_session_key'] = session_key
+                                save_api_creds(creds)
+                                access_token = session_key
+                                del st.session_state['definedge_otp_token']
+                                st.success("Logged In!")
+                                time.sleep(1)
+                                st.rerun()
+                            else:
+                                st.error(msg)
+                    if col2.button("Resend"):
+                        del st.session_state['definedge_otp_token']
+                        st.rerun()
+                        
+            elif access_token:
+                st.success("Connected to Definedge ✅")
+                if st.button("Logout of Definedge", use_container_width=True):
+                    creds['definedge_session_key'] = ''
+                    save_api_creds(creds)
+                    st.rerun()
                 
         expiry_type = st.radio("Select Expiry", ["Current Month", "Next Month"], index=0)
         target_expiry_idx = 0 if expiry_type == "Current Month" else 1
@@ -1253,12 +1312,18 @@ if not nse_json_df.empty:
                 strike_bhav_file=strike_file,
                 prev_bhav_file=prev_file_path
             )
-            render_header(target_exp)
-            display_option_chain(df_wh, access_token, api_provider=api_provider, client_id=client_id)
+            
+            # Render Header only if authenticated OR Upstox
+            if api_provider == "Upstox" or access_token:
+                render_header(target_exp)
+                display_option_chain(df_wh, access_token, api_provider=api_provider, client_id=client_id)
         show_JSTT_H()
     else:
-        render_header()
+        # Avoid rendering header twice if blocked by auth
+        if api_provider == "Upstox" or access_token:
+            render_header()
         st.warning("JSTT Bhavcopy file not found. Please upload 'JSTT Bhavcopy' (CSV/ZIP) in the sidebar.")
 else:
-    render_header()
+    if api_provider == "Upstox" or access_token:
+        render_header()
     st.error("Critical Error: NSE.json could not be loaded.")
