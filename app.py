@@ -348,10 +348,18 @@ def login_definedge(api_token, api_secret, totp_key):
             return None, "Login failed: No otp_token received in Step 1."
 
         # Clean the TOTP key to remove accidental spaces, hyphens, and make it uppercase
-        clean_totp_key = str(totp_key).replace(" ", "").replace("-", "").upper()
+        clean_totp_key = str(totp_key).strip().upper()
+        clean_totp_key = re.sub(r'[\s\-]', '', clean_totp_key)
         
-        # Generate fresh 6-digit TOTP
-        totp_code = pyotp.TOTP(clean_totp_key).now()
+        # Guardrail: Check if the string contains invalid characters before pyotp crashes
+        if not re.match(r'^[A-Z2-7=]+$', clean_totp_key):
+            return None, "❌ Invalid TOTP Secret entered! Base32 Secrets can only contain letters A-Z and numbers 2-7. Please check that you pasted the correct Authenticator setup code, not your password or a 6-digit OTP."
+
+        try:
+            # Generate fresh 6-digit TOTP
+            totp_code = pyotp.TOTP(clean_totp_key).now()
+        except Exception as e:
+            return None, f"Failed to generate TOTP: {str(e)}. Please check your Base32 Secret."
 
         # Step 2: Finalize Login & Retrieve Session Key
         step2_url = "https://signin.definedgesecurities.com/auth/realms/debroking/dsbpkc/token"
