@@ -330,12 +330,16 @@ def save_api_creds(data_dict):
     except:
         pass
 
-# --- MANUAL DEFINEDGE LOGIN: STEP 1 (Request OTP) ---
+# --- CORRECTED DEFINEDGE LOGIN: STEP 1 (Request OTP) ---
 def login_definedge_step1(api_token, api_secret):
     try:
-        step1_url = f"https://signin.definedgesecurities.com/auth/realms/debroking/dsbpkc/login/{api_token}"
-        headers1 = {"api_secret": api_secret}
+        step1_url = f"https://integrate.definedgesecurities.com/dart/v1/login/{api_token}"
+        headers1 = {
+            "api-secret": api_secret,
+            "Content-Type": "application/json"
+        }
         res1 = requests.get(step1_url, headers=headers1, timeout=10)
+        
         if res1.status_code != 200:
             return None, f"Definedge Login Step 1 Failed: {res1.text}"
             
@@ -345,16 +349,15 @@ def login_definedge_step1(api_token, api_secret):
         if otp_token:
             return otp_token, "OTP Sent Successfully."
         else:
-            return None, "Login failed: No otp_token received in Step 1."
+            return None, f"Login failed: No otp_token received in Step 1. Response: {res1.text}"
     except Exception as e:
         return None, f"Definedge Step 1 Exception: {str(e)}"
 
-# --- MANUAL DEFINEDGE LOGIN: STEP 2 (Verify OTP) ---
+# --- CORRECTED DEFINEDGE LOGIN: STEP 2 (Verify OTP) ---
 def login_definedge_step2(api_token, api_secret, otp_token, manual_otp):
     try:
-        step2_url = "https://signin.definedgesecurities.com/auth/realms/debroking/dsbpkc/token"
+        step2_url = "https://integrate.definedgesecurities.com/dart/v1/token"
         
-        # FIX: Definedge requires exactly these 4 JSON keys. No OAuth fluff.
         payload2 = {
             "api_token": api_token,
             "api_secret": api_secret,
@@ -378,7 +381,7 @@ def login_definedge_step2(api_token, api_secret, otp_token, manual_otp):
         if api_session_key:
             return api_session_key, "Success"
         else:
-            return None, "Login successful but no api_session_key found in response."
+            return None, f"Login successful but no api_session_key found. Response: {res2.text}"
     except Exception as e:
         return None, f"Definedge Step 2 Exception: {str(e)}"
 
