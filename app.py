@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 import concurrent.futures
 import zipfile
 import io
+import pyotp
 
 # IST Offset
 IST_OFFSET = timedelta(hours=5, minutes=30)
@@ -330,6 +331,50 @@ def save_api_creds(data_dict):
     except:
         pass
 
+# --- NEW AUTOMATED DEFINEDGE LOGIN FUNCTION ---
+def login_definedge(api_token, api_secret, totp_key):
+    try:
+        # Step 1: Request OTP Token
+        step1_url = f"https://signin.definedgesecurities.com/auth/realms/debroking/dsbpkc/login/{api_token}"
+        headers1 = {"api_secret": api_secret}
+        res1 = requests.get(step1_url, headers=headers1, timeout=10)
+        if res1.status_code != 200:
+            return None, f"Definedge Login Step 1 Failed: {res1.text}"
+            
+        data1 = res1.json()
+        otp_token = data1.get("otp_token")
+        
+        if not otp_token:
+            return None, "Login failed: No otp_token received in Step 1."
+
+        # Generate fresh 6-digit TOTP
+        totp_code = pyotp.TOTP(totp_key).now()
+
+        # Step 2: Finalize Login & Retrieve Session Key
+        step2_url = "https://signin.definedgesecurities.com/auth/realms/debroking/dsbpkc/token"
+        payload2 = {
+            "client_id": "TRTP",
+            "grant_type": "password",
+            "client_secret": api_secret,
+            "otp_token": otp_token,
+            "otp": totp_code
+        }
+        res2 = requests.post(step2_url, data=payload2, timeout=10)
+        
+        if res2.status_code != 200:
+            return None, f"Definedge Login Step 2 Failed: {res2.text}"
+            
+        data2 = res2.json()
+        api_session_key = data2.get("api_session_key")
+        
+        if api_session_key:
+            return api_session_key, "Success"
+        else:
+            return None, "Login successful but no api_session_key found in response."
+            
+    except Exception as e:
+        return None, f"Definedge Login Exception: {str(e)}"
+
 # Constant for NSE JSON
 NSE_JSON_PATH = 'NSE.json'
 
@@ -624,7 +669,7 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
         df['ltp'] = df['instrument_key'].map(ltp_data).fillna(0.0)
     else:
         df['ltp'] = 0.0
-        st.warning(f"Enter Access Token for {api_provider} in sidebar to see live LTP.")
+        st.warning(f"Enter Credentials for {api_provider} in sidebar to see live LTP.")
 
     def clean_ltp(row):
         ltp = row.get('ltp', 0.0)
@@ -837,11 +882,16 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
     puts_df.index = range(1, len(puts_df) + 1)
     puts_df.index.name = 'Sr.'
 
+    # Scrip is deliberately removed from this initial list so it renders unchecked natively
     display_cols = [
         'Symbol', 'StrikePrice', 'ltp', '%P', trigger_col_name, '%H', 'JSTT-C', '%C', 
-        'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'Trade Point Scrip', 'Scrip'
+        'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'Trade Point Scrip'
     ]
     
+    # We append Scrip separately if it exists so Streamlit column_config can manage its visibility
+    if 'Scrip' in calls_df.columns:
+        display_cols.append('Scrip')
+        
     display_cols = [col for col in display_cols if col in calls_df.columns]
     
     # ---------------- DYNAMIC COLOR LOGIC ----------------
@@ -987,12 +1037,21 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
         )
 
 # Secret Handling (Client View Mode)
-is_client_view = "UPSTOX_ACCESS_TOKEN" in st.secrets or "DEFINEDGE_ACCESS_TOKEN" in st.secrets
+is_client_view = "UPSTOX_ACCESS_TOKEN" in st.secrets or ("DEFINEDGE_API_TOKEN" in st.secrets and "DEFINEDGE_API_SECRET" in st.secrets)
 
 if is_client_view:
-    if "DEFINEDGE_ACCESS_TOKEN" in st.secrets:
+    if "DEFINEDGE_API_TOKEN" in st.secrets:
         api_provider = "Definedge"
-        access_token = st.secrets["DEFINEDGE_ACCESS_TOKEN"]
+        # Only login once per session if in client view
+        if 'definedge_session_key' not in st.session_state:
+            key, msg = login_definedge(
+                st.secrets["DEFINEDGE_API_TOKEN"], 
+                st.secrets["DEFINEDGE_API_SECRET"], 
+                st.secrets["DEFINEDGE_TOTP_KEY"]
+            )
+            if key:
+                st.session_state['definedge_session_key'] = key
+        access_token = st.session_state.get('definedge_session_key', "")
         client_id = ""
     else:
         api_provider = "Upstox"
@@ -1027,11 +1086,35 @@ else:
                 save_api_creds(creds)
         else:
             saved_definedge_token = creds.get('definedge_token', '')
-            access_token = st.text_input("Definedge API Session Key", value=saved_definedge_token, type="password")
-            client_id = ""
-            if access_token != saved_definedge_token:
-                creds['definedge_token'] = access_token
+            saved_definedge_secret = creds.get('definedge_secret', '')
+            saved_definedge_totp = creds.get('definedge_totp', '')
+            
+            api_token = st.text_input("Definedge API Token", value=saved_definedge_token, type="password")
+            api_secret = st.text_input("Definedge API Secret", value=saved_definedge_secret, type="password")
+            totp_key = st.text_input("Definedge TOTP Base32 Secret", value=saved_definedge_totp, type="password")
+            
+            # If any of the inputs change, clear the saved session key
+            if api_token != saved_definedge_token or api_secret != saved_definedge_secret or totp_key != saved_definedge_totp:
+                creds['definedge_token'] = api_token
+                creds['definedge_secret'] = api_secret
+                creds['definedge_totp'] = totp_key
+                creds['definedge_session_key'] = ''
                 save_api_creds(creds)
+            
+            client_id = ""
+            access_token = creds.get('definedge_session_key', '')
+            
+            # Automatically fetch a new session key if credentials exist but session key is empty
+            if api_token and api_secret and totp_key and not access_token:
+                with st.spinner("Authenticating with Definedge..."):
+                    session_key, msg = login_definedge(api_token, api_secret, totp_key)
+                    if session_key:
+                        access_token = session_key
+                        creds['definedge_session_key'] = session_key
+                        save_api_creds(creds)
+                        st.success("Successfully logged into Definedge!")
+                    else:
+                        st.error(msg)
                 
         expiry_type = st.radio("Select Expiry", ["Current Month", "Next Month"], index=0)
         target_expiry_idx = 0 if expiry_type == "Current Month" else 1
