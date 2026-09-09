@@ -360,8 +360,18 @@ def login_definedge_step2(api_secret, otp_token, manual_otp):
             "otp_token": otp_token,
             "otp": str(manual_otp).strip()
         }
-        res2 = requests.post(step2_url, data=payload2, timeout=10)
         
+        # FIX: The server is rejecting the default content type. 
+        # We explicitly force the standard Keycloak form-urlencoded format first.
+        headers2 = {"Content-Type": "application/x-www-form-urlencoded"}
+        res2 = requests.post(step2_url, data=payload2, headers=headers2, timeout=10)
+        
+        # Auto-Fallback: If Definedge customized their server to strictly expect JSON instead, 
+        # it throws RESTEASY003065 or a 415 error. We instantly retry with JSON.
+        if "RESTEASY003065" in res2.text or res2.status_code == 415:
+            headers2_alt = {"Content-Type": "application/json", "Accept": "application/json"}
+            res2 = requests.post(step2_url, json=payload2, headers=headers2_alt, timeout=10)
+            
         if res2.status_code != 200:
             return None, f"Definedge Login Step 2 Failed: {res2.text}"
             
