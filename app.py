@@ -333,13 +333,10 @@ def save_api_creds(data_dict):
 # --- CORRECTED DEFINEDGE LOGIN: STEP 1 (Request OTP) ---
 def login_definedge_step1(api_token, api_secret):
     try:
-        step1_url = f"https://integrate.definedgesecurities.com/dart/v1/login/{api_token}"
-        headers1 = {
-            "api-secret": api_secret,
-            "Content-Type": "application/json"
-        }
-        res1 = requests.get(step1_url, headers=headers1, timeout=10)
+        step1_url = f"https://signin.definedgesecurities.com/auth/realms/debroking/dsbpkc/login/{api_token}"
+        headers1 = {"api_secret": api_secret}
         
+        res1 = requests.get(step1_url, headers=headers1, timeout=10)
         if res1.status_code != 200:
             return None, f"Definedge Login Step 1 Failed: {res1.text}"
             
@@ -356,21 +353,21 @@ def login_definedge_step1(api_token, api_secret):
 # --- CORRECTED DEFINEDGE LOGIN: STEP 2 (Verify OTP) ---
 def login_definedge_step2(api_token, api_secret, otp_token, manual_otp):
     try:
-        step2_url = "https://integrate.definedgesecurities.com/dart/v1/token"
+        step2_url = "https://signin.definedgesecurities.com/auth/realms/debroking/dsbpkc/token"
         
         payload2 = {
-            "api_token": api_token,
-            "api_secret": api_secret,
+            "client_id": "TRTP",
+            "grant_type": "password",
+            "client_secret": api_secret,
             "otp_token": otp_token,
             "otp": str(manual_otp).strip()
         }
         
         headers2 = {
-            "Content-Type": "application/json", 
-            "Accept": "application/json"
+            "Content-Type": "application/x-www-form-urlencoded"
         }
         
-        res2 = requests.post(step2_url, json=payload2, headers=headers2, timeout=10)
+        res2 = requests.post(step2_url, data=payload2, headers=headers2, timeout=10)
             
         if res2.status_code != 200:
             return None, f"Definedge Login Step 2 Failed: {res2.text}"
