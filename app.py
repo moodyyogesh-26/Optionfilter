@@ -347,8 +347,11 @@ def login_definedge(api_token, api_secret, totp_key):
         if not otp_token:
             return None, "Login failed: No otp_token received in Step 1."
 
+        # Clean the TOTP key to remove accidental spaces, hyphens, and make it uppercase
+        clean_totp_key = str(totp_key).replace(" ", "").replace("-", "").upper()
+        
         # Generate fresh 6-digit TOTP
-        totp_code = pyotp.TOTP(totp_key).now()
+        totp_code = pyotp.TOTP(clean_totp_key).now()
 
         # Step 2: Finalize Login & Retrieve Session Key
         step2_url = "https://signin.definedgesecurities.com/auth/realms/debroking/dsbpkc/token"
