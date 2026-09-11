@@ -111,7 +111,7 @@ def render_header(target_exp=None):
         
         exp_str = target_exp.strftime('%d-%b-%Y') if hasattr(target_exp, 'strftime') else str(target_exp)
         
-        expiry_html = f'<div style="background-color: #e0f2fe; color: #0369a1; padding: 6px 14px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; border: 1px solid #bae6fd; display: flex; align-items: center; gap: 6px; white-space: nowrap; margin-left: auto;"><span style="background: #bae6fd; padding: 2px 8px; border-radius: 4px; color: #075985; margin-right: 4px;">⏳ T-{days_left}</span><span>📅 Expiry:</span> <strong style="color: #0284c7;">{exp_str}</strong></div>'
+        expiry_html = f'<div style="background-color: #e0f2fe; color: #0369a1; padding: 6px 14px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; border: 1px solid #bae6fd; display: flex; align-items: center; gap: 6px; white-space: nowrap; margin-left: auto;"><span style="background: #bae6fd; padding: 2px 8px; border-radius: 4px; color: #075985; margin-right: 4px;">⏳ {days_left} DTE</span><span>📅 Expiry:</span> <strong style="color: #0284c7;">{exp_str}</strong></div>'
         
     st.markdown(f"""
 <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.5rem; margin-bottom: 1.2rem; flex-wrap: wrap; gap: 16px;">
