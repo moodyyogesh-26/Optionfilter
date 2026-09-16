@@ -788,7 +788,8 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
     # --- DASHBOARD CONTROLS ---
     st.markdown("---")
     
-    col_f0, col_f1, col_f2, col_f3, col_f4, col_f5, col_f6 = st.columns([1.2, 2.2, 0.9, 0.8, 0.8, 0.6, 0.9])
+    # Updated to 8 columns to fit the new "Inside" filter
+    col_f0, col_f1, col_f2, col_f3, col_inside, col_f4, col_f5, col_f6 = st.columns([1.1, 2.2, 0.8, 0.8, 0.9, 0.8, 0.6, 0.9])
     
     with col_f0:
         search_query = st.text_input("🔍 Search:", value="", placeholder="Search anything...", key="search_query_input")
@@ -806,13 +807,22 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
     with col_f3:
         max_lot_input = st.text_input("📦 Max Lot:", value="", placeholder="<= Lot Size")
 
+    with col_inside:
+        # New Feature: Inside filter dropdown
+        inside_filter = st.selectbox(
+            "🎯 Inside:", 
+            options=["All", "abv H", "H - C", "C - L", "blw L"], 
+            index=0, 
+            key="inside_filter_select"
+        )
+
     with col_f4:
         # Sort is strictly handled via this Dropdown independent of the filter above
         sort_by = st.selectbox("↕️ Sort:", options=["%P", "%H", "%C", "%L", "Diff", "Lot Size", "Symbol", "Sr."], index=0, key="sort_by_select")
     
     with col_f5:
         color_toggle = st.radio("🎨 Color:", options=["On", "Off"], key="color_toggle_radio")
-       
+        
     with col_f6:
         layout_view = st.radio(
             "Layout:",
@@ -861,6 +871,17 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
             df = df[df['Lot Size'] <= max_lot_val]
         except ValueError:
             pass
+
+    # Apply 'Inside' Filter Logic
+    if inside_filter == "abv H":
+        df = df[df['ltp'] > df[trigger_col_name]]
+    elif inside_filter == "H - C":
+        df = df[(df['ltp'] <= df[trigger_col_name]) & (df['ltp'] >= df['JSTT-C'])]
+    elif inside_filter == "C - L":
+        df = df[(df['ltp'] < df['JSTT-C']) & (df['ltp'] >= df['JSTT-L'])]
+    elif inside_filter == "blw L":
+        df = df[df['ltp'] < df['JSTT-L']]
+    # If "All" is selected, the DataFrame passes through without modification
 
     calls_df = df[df['OptionType'] == 'CE'].copy()
     puts_df = df[df['OptionType'] == 'PE'].copy()
