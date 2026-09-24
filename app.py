@@ -830,7 +830,9 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
         )
 
     # --- NEW FEATURE: SCRIP VISIBILITY TOGGLES ---
-    st.markdown("<div style='padding-top: 5px; padding-bottom: 5px;'>", unsafe_allow_html=True)
+    # Use negative top margin to pull the checkbox row tightly against the filters
+    st.markdown("<div style='margin-top: -40px;'></div>", unsafe_allow_html=True)
+    
     scrip_col1, scrip_col2, scrip_col3, empty_col = st.columns([1.5, 1.5, 1.5, 5.5])
     
     with scrip_col1:
@@ -840,7 +842,6 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
     with scrip_col3:
         show_broker_scrip = st.checkbox("Broker Scrip", value=True, key="chk_broker")
         
-    st.markdown("</div>", unsafe_allow_html=True)
     st.markdown("---")
     # ----------------------------------------
 
