@@ -545,9 +545,9 @@ def process_bhavcopy(bhav_file, df_json, target_expiry_index=0, strike_bhav_file
         # Shared strike formatting: remove trailing '.0'
         strike_str = final_df['StrikePrice'].astype(str).str.replace(r'\.0$', '', regex=True)
 
-        # Scrip format (e.g. "BSE SEP 3400 CE")
+        # Broker Scrip format (e.g. "BSE SEP 3400 CE")
         month_str = final_df['ExpiryDate'].dt.strftime('%b').str.upper()
-        final_df['Scrip'] = (
+        final_df['Broker Scrip'] = (
             final_df['Symbol'] + " " + 
             month_str + " " + 
             strike_str + " " + 
@@ -788,7 +788,6 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
     # --- DASHBOARD CONTROLS ---
     st.markdown("---")
     
-    # Updated to 8 columns to fit the new "Inside" filter
     col_f0, col_f1, col_f2, col_f3, col_inside, col_f4, col_f5, col_f6 = st.columns([1.1, 2.2, 0.8, 0.8, 0.9, 0.8, 0.6, 0.9])
     
     with col_f0:
@@ -808,7 +807,7 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
         max_lot_input = st.text_input("📦 Max Lot:", value="", placeholder="<= Lot Size")
 
     with col_inside:
-        # New Feature: Inside filter dropdown
+        # Inside filter dropdown
         inside_filter = st.selectbox(
             "🎯 Inside:", 
             options=["All", "abv H", "H - C", "C - L", "blw L"], 
@@ -829,7 +828,19 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
             options=["↔️ Split", "📈 CE Max", "📉 PE Max"],
             key="table_layout_radio"
         )
+
+    # --- NEW FEATURE: SCRIP VISIBILITY TOGGLES ---
+    st.markdown("<div style='padding-top: 5px; padding-bottom: 5px;'>", unsafe_allow_html=True)
+    scrip_col1, scrip_col2, scrip_col3, empty_col = st.columns([1.5, 1.5, 1.5, 5.5])
+    
+    with scrip_col1:
+        show_tv_scrip = st.checkbox("Tradingview Scrip", value=True, key="chk_tv")
+    with scrip_col2:
+        show_tp_scrip = st.checkbox("Trade Point Scrip", value=True, key="chk_tp")
+    with scrip_col3:
+        show_broker_scrip = st.checkbox("Broker Scrip", value=True, key="chk_broker")
         
+    st.markdown("</div>", unsafe_allow_html=True)
     st.markdown("---")
     # ----------------------------------------
 
@@ -910,15 +921,19 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
     puts_df.index = range(1, len(puts_df) + 1)
     puts_df.index.name = 'Sr.'
 
-    # Scrip is deliberately removed from this initial list so it renders unchecked natively
+    # Build display columns dynamically based on checkboxes
     display_cols = [
         'Symbol', 'StrikePrice', 'ltp', '%P', trigger_col_name, '%H', 'JSTT-C', '%C', 
-        'JSTT-L', '%L', 'Diff', 'Lot Size', 'Tradingview Scrip', 'Trade Point Scrip'
+        'JSTT-L', '%L', 'Diff', 'Lot Size'
     ]
     
-    # We append Scrip separately if it exists so Streamlit column_config can manage its visibility
-    if 'Scrip' in calls_df.columns:
-        display_cols.append('Scrip')
+    # Append Scrip columns conditionally based on checkbox states
+    if show_tv_scrip and 'Tradingview Scrip' in calls_df.columns:
+        display_cols.append('Tradingview Scrip')
+    if show_tp_scrip and 'Trade Point Scrip' in calls_df.columns:
+        display_cols.append('Trade Point Scrip')
+    if show_broker_scrip and 'Broker Scrip' in calls_df.columns:
+        display_cols.append('Broker Scrip')
         
     display_cols = [col for col in display_cols if col in calls_df.columns]
     
@@ -1009,7 +1024,7 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
         'Lot Size': '{:d}'
     }
 
-    # Render layout with column_config to hide 'Scrip' by default
+    # Render layout without explicit column_config overrides since we filter via display_cols array
     if layout_view == "↔️ Split":
         col1, col2 = st.columns(2)
         with col1:
@@ -1020,7 +1035,6 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
                 .apply(color_p_percent, subset=['%P'])
                 .format(format_dict)
                 .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
-                column_config={"Scrip": None},
                 use_container_width=True,
                 height=1800
             )
@@ -1033,7 +1047,6 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
                 .apply(color_p_percent, subset=['%P'])
                 .format(format_dict)
                 .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
-                column_config={"Scrip": None},
                 use_container_width=True,
                 height=1800
             )
@@ -1046,7 +1059,6 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
             .apply(color_p_percent, subset=['%P'])
             .format(format_dict)
             .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
-            column_config={"Scrip": None},
             use_container_width=True,
             height=1800
         )
@@ -1059,7 +1071,6 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
             .apply(color_p_percent, subset=['%P'])
             .format(format_dict)
             .set_properties(**{'font-weight': '600', 'text-align': 'center', 'font-size': '16px'}),
-            column_config={"Scrip": None},
             use_container_width=True,
             height=1800
         )
