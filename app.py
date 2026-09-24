@@ -831,7 +831,7 @@ def display_option_chain(df, access_token, api_provider="Upstox", client_id=""):
 
     # --- NEW FEATURE: SCRIP VISIBILITY TOGGLES ---
     # Use negative top margin to pull the checkbox row tightly against the filters
-    st.markdown("<div style='margin-top: -40px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-top: -70px;'></div>", unsafe_allow_html=True)
     
     scrip_col1, scrip_col2, scrip_col3, empty_col = st.columns([1.5, 1.5, 1.5, 5.5])
     
